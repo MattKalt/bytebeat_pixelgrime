@@ -105,10 +105,21 @@ Has a tendency to 'wander', so use a limiter on the final mix
 dsp = downsample the bitrate of the reverb, dsp=2 cuts uses half as much space, 3 uses 1/3, etc
 	using values besides {1, 2, 3} can produce hi-pitch hum, however
 */
+/*
 rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T) => (
 	input = input*dry + wet * seq( F, 0, I + ( t2 % len ) / dsp, 1 ) || 0,
 	T % dsp ? 0 : F[ I + ( (T % len) / dsp )|0 ] = input * feedb,
 	//F[ I + ( (T % len) / dsp )|0 ] = input * feedb ** (1/dsp), //higher dsp adds dampening
+	I += 0|(len / dsp),
+	input
+),
+*/
+rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T, highpass=.03, lerp=4, vibrato=1 ) => (
+	t2 += 99 + 99 * sin(T*vibrato/3e5),
+	input = input*dry + wet * seq( F, 0, I + ( t2 % len ) / dsp, lerp ) || 0,
+	//T % dsp ? 0 : F[ I + ( (T % len) / dsp )|0 ] = input * feedb,
+	//F[ I + ( (T % len) / dsp )|0 ] = input * feedb ** (1/dsp), //higher dsp adds dampening
+	F[ I + ( (T % len) / dsp )|0 ] = hp( input * feedb, highpass), //higher dsp adds dampening
 	I += 0|(len / dsp),
 	input
 ),
@@ -120,7 +131,13 @@ lp = lopass = (x, f) => ( // f ~= frequency, but not 1:1
 	F[I] = min( max( x % 256, F[I] - f), F[I++] + f) // Clamp the change since last sample between (-f, f)
 ),
 
-//For a hi-pass sound, m(x)^lp(x) sounds more harsh; lim(x, 9, <# under 256> ) sounds more natural, but is sosig
+
+
+lp2 = (x,f) =>
+	F[I] = F[I++] * (1-f) + x * f
+,
+
+hp = (x,f) => x - lp2(x,f),
 
 
 /*
@@ -360,6 +377,12 @@ vb2 = r(1,[
 	r(3, vb1), v4, 1,0,1,0, r(4,1)
 ]),
 
+a1 = [12,7,13,8],
+
+a2 = r(1,[
+	0,7, a1, -2,0, a1, 0,1,11,6
+]),
+
 0
 ),
 
@@ -368,17 +391,22 @@ vb2 = r(1,[
 
 tn1 = [0x71010599, 0x61010599],
 
-L1 = ch => sy( mseq(m5,10), v5, 11, 1.07, tn1[ch] ),
+L1 = ch => sy( mseq(m5,10,t,0), v5, 11, 1.07, tn1[ch] ),
+L2 = [L1(0),L1(1)], //cacheing for performance
 
-B1 = mseq(b2,10) & 255 * seq(vb2,11),
+A1 = sy( mseq(a2,10),[1],10, 4.6, 0x712b2321),
+//A1 = sy( mseq(a2,10),[1],10, 4.6, 0xa21b02a6),
+
+B1 = mseq(b2,10,t,0) & 255 * seq(vb2,11),
 B2 = s2s(B1),
 B3 = (-B1 & B2),
 
 Master = ch => lim(
 
-L1(ch) + B3
+L2[ch]/2 + B3 + A1/9 +
 
-, .01, 512, 1, 250 ),
+rv(A1 + L2[ch]*2, 24e3, 2.1,.2,.5,4,T,.03,2,ch+.5)/3
+, .01, 512, 1, 350 ),
 
 [
 Master(0), Master(1)
