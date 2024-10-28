@@ -6,9 +6,9 @@ T = t,
 t *= r8 = 10 / 48,
 
 //master pitch, CHANGES BELOW
-mp = 8.5-12,
+mp = -3.5,
+//mp = -5, //for r8=11
 
-//t = ( 1024 & t )/4 + t, //FAST SWANG! (drums sound scuffed)
 
 // Repeat x beats of y
 // SUPER useful if you're writing complex beats/melodies
@@ -284,13 +284,32 @@ s2s = sinify = x => sin( x*PI/64 ) * 126 + 128,
 v = vibrato = sin(T>>10)/2,
 
 
+//replaces wanted char with '1' and everything else with '0'
+on = (str, wanted) =>
+	str.replaceAll( RegExp( '[^' + wanted + ']', 'g' ), '0' ).replaceAll( RegExp( wanted, 'g'), '1' ),
+
+ht = halftime = arr => (
+	arr = r(1,arr), //flatten
+	r(arr.length * 2).map( (e,i) => arr[i/2|0] )
+),
+
 
 //------------------ SEQUENCES -----------------------------------
 
 //Do not take any of this out of the 't ? 0' statement
 t ? 0 : (
 
-m1 = r(1, [
+/*
+	The form:
+	
+	r(1,[
+		arrays with nesting
+	]),
+
+	can be avoided by simply taking the final usable arrays with array.flat() or r(1,array)
+*/
+
+m1 = r(1,[
 	r(4, 0), r(2, [0,1,2,3])
 ]),
 
@@ -298,15 +317,23 @@ v1 = r(1,[
 	1,0,1,0, r(12, 1)
 ]),
 
-f1 = [0,8,3,8],
+f1 = [0,8,1,8],
 
 f2 = [0,7,3,10],
 
-l1 = r(1, [m1, f1, m1, f2]),
+//only one not halftime
+f3 = r(1,[
+	0,0,12,10, ht([7,6,3,2,0, r(6, -1 ), 8,1,8 ])
+]),
 
-//replaces wanted char with '1' and everything else with '0'
-on = (str, wanted) =>
-	str.replaceAll( RegExp( '[^' + wanted + ']', 'g' ), '0' ).replaceAll( RegExp( wanted, 'g'), '1' ),
+l1 = r(1,[
+ ht([m1, f1, m1, f2, m1, f1]), f3 
+]),
+
+v2 = r(1, [
+	//r(3, v1), 1, 2, r(6, 1), 0,0,1,0, 1,1,1,1
+	r(3, v1), 1, 2, r(6, 1), 0,0,1,0, r(4,1)
+]),
 
 0
 ),
@@ -316,8 +343,8 @@ on = (str, wanted) =>
 
 [
 
-sy( mseq(l1,11), [1], 11, 1.07, 0x71010599) * seq(v1,11)
+sy( mseq(l1,10), v2, 11, 1.07, 0x71010599)
 ,
-sy( mseq(l1,11), [1], 11, 1.07, 0x61010599) * seq(v1,11)
+sy( mseq(l1,10), v2, 11, 1.07, 0x61010599)
 
 ]
