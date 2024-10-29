@@ -436,7 +436,7 @@ btc = "1hhhshhh1h1hs1hh",
 btd = "1hhhs h11hh1s1h1",
 bte = "11h1s1h1h111s1ss",
 
-btf = j( r(1, [ r(240, "0"), r(7, bta), r(13, bta+btb), r(15, btc), r(9, btd), r(9, btc+btd+btc+bte), r(2, bte), r(16, 1 ), r(2, "s1s1"), r(8,"1") ] ) ),
+btf = j( r(1, [ r(240, "0"), r(7, bta), r(13, bta+btb), r(8, btc), r(9, btc+btd+btc+bte), r(2, bte), r(16, 1 ), r(2, "s1s1"), r(8,"1") ] ) ),
 
 drh = on(btf,"h"),
 drs = on(btf,"s"),
@@ -484,7 +484,7 @@ vl = 2-(t/512%2),
 fb=[vl+.3,vl+.3,vl/2+1,vl],
 
 //Mute
-t>>18==7&&(L2=fb=[0,0.5],A1=L3=DR=B3=0),
+t>>9>=3074&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
 
 
 V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 8e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
