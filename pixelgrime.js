@@ -41,7 +41,7 @@ ds = (x, amt) => x * (1 - amt) + 127 * ( ( ( x / 127 ) - 1 ) ** 3 + 1 ) * amt,
 // If you see red (NaNs), raise 26e3 higher, or adjust your reverbs' 'dsp' variable (and limiters' lookahead)
 // Works best when effects are not inside conditionals (meaning the number of F in use changes)
 // But even then, should only create a momentary click/pop (might be more severe for reverb)
-T ? 0 : F = r( 2048, 0 ),
+T ? 0 : F = r( 4096, 0 ),
 // Iterator, resets to 0 at every t
 I = 0,
 
@@ -406,7 +406,7 @@ a2 = r(1,[
 l1a = [5,7,8,10,1,4,-2,3],
 //l1a = [5,7,8,10,11,12,13,14],
 
-tn1 = [0x71010599, 0x610105ff],
+tn1 = [0x71010559, 0x610105ff],
 ta = r(1, [ r(4, 0x712b2321), r(2, 0xa21b02a6 ), 0x63010201 ] ),
 
 vv=[11,12,13,14,15],
@@ -433,7 +433,7 @@ l3v = '0289569999',
 
 //----------------- MIXER -----------
 
-L1 = ch => sy( mseq(m5,10,t,0), v5, 11, 1.07, tn1[ch] ),
+L1 = ch => sy( mseq(m5,10,t,0), v5, 11, 1.07, tn1[ch] ) * (1+ch/8),
 L2 = [L1(0),L1(1)], //cacheing for performance
 
 L3 = mseq(l1a,15,t,2)^mseq(l1a,15,t,8),
@@ -459,16 +459,16 @@ B3 = (-B1 & B2),
 //V = rvs( A1 + L2[0], 20e3, [11,12,13,14,15], 2-(t/512%2), .2, 1, (t>>16)+1, 4, .1, .1, 16, [T,T+11e4,T+13e4,T+17e4,T+19e4], 99 ),
 
 A1 *= seq(av,18),
-L3 *= seq(l3v,17,t,1)/7,
+L3 *= seq(l3v,17,t,1)/8,
 
 vl = 2-(t/512%2),
-fb=[vl+.3,vl+.3,vl/2+1,vl],
+fb=[vl/2+1,vl+.3,vl/2+1,vl],
 
 //Mute
 t>>9>=3074&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
 
 
-V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 8e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
+V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 9e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
 
 
 
