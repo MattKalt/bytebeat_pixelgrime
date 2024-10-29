@@ -114,21 +114,59 @@ rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T)
 	input
 ),
 */
-rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T, highpass=.03, lerp=4, vibrato=1 ) => (
+
+rv2 = reverb2 = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T, highpass=.03, lerp=4, vibrato=1) => (
 	t2 += 99 + 99 * sin(T*vibrato/3e5),
 	input = input*dry + wet * seq( F, 0, I + ( t2 % len ) / dsp, lerp ) || 0,
+	//input = tanh(input/256)*256,
 	//T % dsp ? 0 : F[ I + ( (T % len) / dsp )|0 ] = input * feedb,
 	//F[ I + ( (T % len) / dsp )|0 ] = input * feedb ** (1/dsp), //higher dsp adds dampening
 	F[ I + ( (T % len) / dsp )|0 ] = hp( input * feedb, highpass), //higher dsp adds dampening
+	//F[ I + ( (T % len) / dsp )|0 ] = tanh(hp( input * feedb, highpass)/256)*256, //higher dsp adds dampening	
 	I += 0|(len / dsp),
 	input
 ),
 
 
-lp = lopass = (x, f) => ( // f ~= frequency, but not 1:1
+rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T, highpass=.03, lerp=4, vibratoDepth=99, vibratoSpeed=1, compSpeed = .1, compThresh = 64 ) => (
+	//pk = lp( abs( hp(input,.01) ), compSpeed),
+	t2 += vibratoDepth + vibratoDepth * sin(T*vibratoSpeed/3e5),
+	//input = input*dry + wet * seq( F, 0, I + 1 + ( t2 % len ) / dsp, lerp ) || 0,
+	//input = hp( input*dry + wet * seq( F, 0, I + 1 + ( t2 % len ) / dsp, lerp ) || 0, highpass), //phaser
+	input = hp( input*dry + wet * seq( F, 0, I + 2 + ( t2 % len ) / dsp, lerp ) || 0, highpass),
+	//pk = lp( max( compThresh, abs( hp(input,.01) ) ), compSpeed),
+	pk = lp( max( compThresh, abs( input ) ), compSpeed, 99 ),
+	//input = tanh(input/256)*256,
+	//T % dsp ? 0 : F[ I + ( (T % len) / dsp )|0 ] = input * feedb,
+	//F[ I + ( (T % len) / dsp )|0 ] = input * feedb ** (1/dsp), //higher dsp adds dampening
+	//F[ I + ( (T % len) / dsp )|0 ] = hp( input * feedb, highpass), //higher dsp adds dampening
+	//F[ I + ( (T % len) / dsp )|0 ] = hp( input * feedb * compThresh / max( pk, compThresh ), highpass), //higher dsp adds dampening
+	F[ I + ( (T % len) / dsp )|0 ] = input * feedb * compThresh / max( pk, compThresh ), //higher dsp adds dampening
+	//F[ I + ( (T % len) / dsp )|0 ] = tanh(hp( input * feedb, highpass)/256)*256, //higher dsp adds dampening	
+	I += 0|(len / dsp),
+	input
+	//F[ I - 0|(len / dsp) + ( (T % len) / dsp )|0 ]
+),
+
+rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [1,2], feedb = .7, dry = .4, wet = 1, dsp = 3, lerpx=4, highpass=.03, compSpeed = .1, compThresh = 64, t2 = [T,T], vibratoDepth = 99 ) => (
+	hd=ou=p=q=[0,0],
+	q.map( (e,i) => (
+		hd[i] = t2[i] + vibratoDepth +  vibratoDepth * sin(T*vibratoSpeed[i]/3e5),
+		ou[i] = hp( input*dry + wet * seq( F, 0, I + 4 + ( hd[i] % len ) / dsp, lerpx ) || 0, highpass),
+		p[i] = lp( max( compThresh, abs( input ) ), compSpeed, 99 ),
+		ou[i] *= feedb * compThresh / max( p[i], compThresh )
+	)),
+	F[ I + ( (T % len) / dsp )|0 ] = ou[0] + ou[1],
+	I += 0|(len / dsp),
+	ou
+	//F[ I - 0|(len / dsp) + ( (T % len) / dsp )|0 ]
+),
+
+
+lp = lopass = (x, f, bias=1) => ( // f ~= frequency, but not 1:1
 	// F[I] is the value of the last sample
 	// You will need to change the 'x % 256' if you're using signed or floatbeat
-	F[I] = min( max( x % 256, F[I] - f), F[I++] + f) // Clamp the change since last sample between (-f, f)
+	F[I] = min( max( x % 256, F[I] - f), F[I++] + f * bias) // Clamp the change since last sample between (-f, f)
 ),
 
 
@@ -401,13 +439,41 @@ B1 = mseq(b2,10,t,0) & 255 * seq(vb2,11),
 B2 = s2s(B1),
 B3 = (-B1 & B2),
 
-Master = ch => lim(
+//Master = ch => lim(
+Master = ch => tanh(hp(
 
-L2[ch]/2 + B3 + A1/9 +
+( L2[ch]/2 + B3 + A1/9 ) * 1 +
 
-rv(A1 + L2[ch]*2, 24e3, 2.1,.2,.5,4,T,.03,2,ch+.5)/3
-, .01, 512, 1, 350 ),
+//rv(L2[0]*2, 24e3, 2.1,.2,.5,4,T,.03,2,99,ch+.5)/3
+0
 
-[
-Master(0), Master(1)
-]
+//, .01, 512, 1, 350 ),
+,0)/64)*128+127,
+
+//[Master(0), Master(1)]
+
+//,(rv(L2[0]*2, 24e3, 2.1,.2,.5,4,T,.03,2,1)-20)*10
+
+//,rv( L2[0] + B3, 20000, 1, .1, 1, 4,T,1e-2,4,1,9,.1,32)
+
+//,rvs( s2s(t&t>>9) , 80e3, [1,2], .7, .4, 1, 3, 4, .03, .1, 64, [T,T], 99 )
+
+//V = (mas, vsp) => rv( Master(mas), 40e3, 4, .4, 1, 3, T, .01, 4, 99, vsp, .1, 6 ),
+
+V = (mas, vsp, final) => ( o = rv( s2s(t&t>>9), 80e3, 8, .3, 1, 6, T, .03, 4, 199, vsp, .01, 6 ), final?0: 
+I-=(80e3/6|0)+2, o),
+
+
+V1 = V(0,7,0),
+//I-=(40e3/3|0)+3,
+V2 = V(1,9,0),
+//I-=(40e3/3|0)+3,
+V3 = V(0,5,0),
+//I-=(40e3/3|0)+3,
+V4 = V(1,3,1),
+
+
+
+[V1+V3,V2+V4]
+
+//,a=()=>{throw(I)},a()
