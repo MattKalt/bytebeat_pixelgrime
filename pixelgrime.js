@@ -117,37 +117,18 @@ rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T)
 ),
 */
 
-rv2 = reverb2 = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T, highpass=.03, lerp=4, vibrato=1) => (
-	t2 += 99 + 99 * sin(T*vibrato/3e5),
-	input = input*dry + wet * seq( F, 0, I + ( t2 % len ) / dsp, lerp ) || 0,
-	//input = tanh(input/256)*256,
-	//T % dsp ? 0 : F[ I + ( (T % len) / dsp )|0 ] = input * feedb,
-	//F[ I + ( (T % len) / dsp )|0 ] = input * feedb ** (1/dsp), //higher dsp adds dampening
-	F[ I + ( (T % len) / dsp )|0 ] = hp( input * feedb, highpass), //higher dsp adds dampening
-	//F[ I + ( (T % len) / dsp )|0 ] = tanh(hp( input * feedb, highpass)/256)*256, //higher dsp adds dampening	
-	I += 0|(len / dsp),
-	input
-),
-
 
 rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T, highpass=.03, lerp=4, vibratoDepth=99, vibratoSpeed=1, compSpeed = .1, compThresh = 64 ) => (
-	//pk = lp( abs( hp(input,.01) ), compSpeed),
 	t2 += vibratoDepth + vibratoDepth * sin(T*vibratoSpeed/3e5),
-	//input = input*dry + wet * seq( F, 0, I + 1 + ( t2 % len ) / dsp, lerp ) || 0,
 	//input = hp( input*dry + wet * seq( F, 0, I + 1 + ( t2 % len ) / dsp, lerp ) || 0, highpass), //phaser
 	input = hp( input*dry + wet * seq( F, 0, I + 2 + ( t2 % len ) / dsp, lerp ) || 0, highpass),
-	//pk = lp( max( compThresh, abs( hp(input,.01) ) ), compSpeed),
 	pk = lp( max( compThresh, abs( input ) ), compSpeed, 99 ),
 	//input = tanh(input/256)*256,
-	//T % dsp ? 0 : F[ I + ( (T % len) / dsp )|0 ] = input * feedb,
-	//F[ I + ( (T % len) / dsp )|0 ] = input * feedb ** (1/dsp), //higher dsp adds dampening
-	//F[ I + ( (T % len) / dsp )|0 ] = hp( input * feedb, highpass), //higher dsp adds dampening
-	//F[ I + ( (T % len) / dsp )|0 ] = hp( input * feedb * compThresh / max( pk, compThresh ), highpass), //higher dsp adds dampening
+
 	F[ I + ( (T % len) / dsp )|0 ] = input * feedb * compThresh / max( pk, compThresh ), //higher dsp adds dampening
 	//F[ I + ( (T % len) / dsp )|0 ] = tanh(hp( input * feedb, highpass)/256)*256, //higher dsp adds dampening	
 	I += 0|(len / dsp),
 	input
-	//F[ I - 0|(len / dsp) + ( (T % len) / dsp )|0 ]
 ),
 
 rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [1,2], feedb = .7, dry = .4, wet = 1, dsp = 3, lerpx=4, highpass=.03, compSpeed = .1, compThresh = 64, t2 = [T,T], vibratoDepth = 99 ) => (
@@ -444,7 +425,7 @@ drk = on(btf,"1"),
 
 
 av = '0111111',
-l3v = '0288669999',
+l3v = '0289569999',
 
 0
 ),
@@ -478,7 +459,7 @@ B3 = (-B1 & B2),
 //V = rvs( A1 + L2[0], 20e3, [11,12,13,14,15], 2-(t/512%2), .2, 1, (t>>16)+1, 4, .1, .1, 16, [T,T+11e4,T+13e4,T+17e4,T+19e4], 99 ),
 
 A1 *= seq(av,18),
-L3 *= seq(l3v,17,t,1)/8,
+L3 *= seq(l3v,17,t,1)/7,
 
 vl = 2-(t/512%2),
 fb=[vl+.3,vl+.3,vl/2+1,vl],
