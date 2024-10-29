@@ -7,6 +7,8 @@ t *= r8 = 10 / 48,
 
 //master pitch, CHANGES BELOW
 mp = -3.5,
+
+
 //mp = -5, //for r8=11
 
 
@@ -51,7 +53,7 @@ I = 0,
 /*v slight perf boost:*/
 seq=(r,s,t2=t,x=0)=>(i=t2/2**s,J=i|0,L=r.length,x?(k=(i-J)**x,(1-k)*r[J%L]+k*r[(J+1)%L]):r[J%L]),
 
-
+mp = seq([0,-2,1,-3],18) - 3.5,
 
 //mseq = ( ...x ) => t * 2 ** ( seq(...x) / 12 ), //original
 mseq = ( ...x ) => t * 2 ** ( ( seq(...x) + mp )  / 12 ), //Trucker's Chorus version (specific to this song)
@@ -149,19 +151,16 @@ rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T,
 ),
 
 rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [1,2], feedb = .7, dry = .4, wet = 1, dsp = 3, lerpx=4, highpass=.03, compSpeed = .1, compThresh = 64, t2 = [T,T], vibratoDepth = 99 ) => (
-	o=out=t2,peak=[9,9],
+	o=out=t2,peak=[0,0],
 	t2.map( (t2val,i) => (
 		t2[i] += vibratoDepth * 2 +  vibratoDepth * sin(T*vibratoSpeed[i]/3e5),
 		o[i] = hp( input*dry + wet * seq( F, 0, I + t2.length*2 + ( t2[i] % len ) / dsp, lerpx ) || 0, highpass),
 		peak[i] = lp( max( compThresh, abs( o[i] ) ), compSpeed, 99 ),
 		o[i] *= feedb * compThresh / max( peak[i], compThresh )
-		//o[i] *= feedb
 	)),
 	F[ I + ( (T % len) / dsp )|0 ] = o.reduce((a,e)=>a+=e),
 	I += 0|(len / dsp),
-	//[o.reduce((a,e,i)=>a+=i&1?e:0),o.reduce((a,e,i)=>a+=i&1?0:e)]
 	o.map((e,i)=>out[i%2]+=e),out
-	//F[ I - 0|(len / dsp) + ( (T % len) / dsp )|0 ]
 ),
 
 
@@ -423,6 +422,22 @@ a2 = r(1,[
 	0,7, a1, -2,0, a1, 0,1,11,6
 ]),
 
+l1a = [5,7,8,10,1,4,-2,3],
+
+//l1a = [5,7,8,10,11,12,13,14],
+
+
+
+btd = "1hhhshhh1h1hs1hh",
+btb = "1 h s h 1 h s1hh",
+btc = "1 h s h11 h1s1h1",
+bta = "1hhhs h11hh1s1h1",
+
+
+drh = on(bta,"h"),
+drs = on(bta,"s"),
+drk = on(bta,"1"),
+
 0
 ),
 
@@ -434,6 +449,19 @@ tn1 = [0x71010599, 0x61010599],
 L1 = ch => sy( mseq(m5,10,t,0), v5, 11, 1.07, tn1[ch] ),
 L2 = [L1(0),L1(1)], //cacheing for performance
 
+L3 = mseq(l1a,15,t,2)^mseq(l1a,15,t,8),
+
+L3 = L3*2&t>>5&31,
+
+//K = (sin(cbrt(199*(t%1024)))*127+(t/2&127))*bt(drk,10,1)**(1/8),
+K = (sin(sqrt(6*(t%1024)))*127+(t/2&127))*bt(drk,10,1)**(1/8),
+HH = bt([h],10)*seq(drh,10),
+SN = bt([s],10)*seq(drs,10),
+
+DR = HH + SN + K * 3,
+
+//L3 = s2s(mseq(l1a,15,t,4)*8)/8,
+
 A1 = sy( mseq(a2,10),[1],10, 4.6, 0x712b2321),
 //A1 = sy( mseq(a2,10),[1],10, 4.6, 0xa21b02a6),
 
@@ -441,27 +469,33 @@ B1 = mseq(b2,10,t,0) & 255 * seq(vb2,11),
 B2 = s2s(B1),
 B3 = (-B1 & B2),
 
+//V = rvs( A1 + L2[0], 20e3, [11,12,13,14,15], 2-(t/512%2), .2, 1, (t>>16)+1, 4, .1, .1, 16, [T,T+11e4,T+13e4,T+17e4,T+19e4], 99 ),
+
+//Mute
+t>>12<64?A1=L3=DR=0:0,
+
+vl = 2-(t/512%2),
+
+//V = rvs( A1/3 + L2[0]/2 + (2-vl) * 2 * L3, 8e3, [11,12,13,14,15], vl, .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
+//V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 8e3, [11,12,13,14,15], vl+.3, .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
+V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 8e3, [11,12,13,14,15], vl/2+1, .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
+
+
+
 //Master = ch => lim(
 Master = ch => tanh(hp(
 
-( L2[ch]/2 + B3 + A1/9 ) * 1 +
+( L2[ch]/2 + B3 + A1/9 + DR ) * min(1,t/1e6+.5) +
 
 //rv(L2[0]*2, 24e3, 2.1,.2,.5,4,T,.03,2,99,ch+.5)/3
-0
 
-//, .01, 512, 1, 350 ),
-,0)/64)*128+127,
+lp2( V[ch], min(1,t/1e5)) * min(1.5,t/5e5+.3)
 
-//[Master(0), Master(1)]
+//, 1, 512, 1, 150 ),
+,.001)/max(150,300-t/8e3)),
 
-//,(rv(L2[0]*2, 24e3, 2.1,.2,.5,4,T,.03,2,1)-20)*10
+[Master(0), Master(1)]
 
-//,rv( L2[0] + B3, 20000, 1, .1, 1, 4,T,1e-2,4,1,9,.1,32)
-
-V = rvs( s2s(t&t>>9) , 20e3, [11,12,13,14,15], .4, .4, 1, 8, 0, .03, .1, 64, [T,T-11e3,T-13e3,T-17e3,T-19e3], 99 ),
-//[V[0]+V[1]+V[4],V[2]+V[3]+V[4]]
-V
-//V = (mas, vsp) => rv( Master(mas), 40e3, 4, .4, 1, 3, T, .01, 4, 99, vsp, .1, 6 ),
 
 
 
