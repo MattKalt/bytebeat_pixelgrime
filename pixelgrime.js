@@ -41,7 +41,7 @@ ds = (x, amt) => x * (1 - amt) + 127 * ( ( ( x / 127 ) - 1 ) ** 3 + 1 ) * amt,
 // If you see red (NaNs), raise 26e3 higher, or adjust your reverbs' 'dsp' variable (and limiters' lookahead)
 // Works best when effects are not inside conditionals (meaning the number of F in use changes)
 // But even then, should only create a momentary click/pop (might be more severe for reverb)
-T ? 0 : F = r( 56e3, 0 ),
+T ? 0 : F = r( 2048, 0 ),
 // Iterator, resets to 0 at every t
 I = 0,
 
@@ -425,7 +425,7 @@ a2 = r(1,[
 l1a = [5,7,8,10,1,4,-2,3],
 //l1a = [5,7,8,10,11,12,13,14],
 
-tn1 = [0x71010599, 0x61010599],
+tn1 = [0x71010599, 0x610105ff],
 ta = r(1, [ r(4, 0x712b2321), r(2, 0xa21b02a6 ), 0x63010201 ] ),
 
 vv=[11,12,13,14,15],
@@ -436,7 +436,7 @@ btc = "1hhhshhh1h1hs1hh",
 btd = "1hhhs h11hh1s1h1",
 bte = "11h1s1h1h111s1ss",
 
-btf = j( r(1, [ r(240, "0"), r(15, bta), r(18, btb), r(15, btc), r(17, btd), r(11, btc+btd+btc+bte), r(4, bte) ] ) ),
+btf = j( r(1, [ r(240, "0"), r(7, bta), r(13, bta+btb), r(15, btc), r(9, btd), r(9, btc+btd+btc+bte), r(2, bte), r(16, 1 ), r(2, "s1s1"), r(8,"1") ] ) ),
 
 drh = on(btf,"h"),
 drs = on(btf,"s"),
@@ -444,7 +444,7 @@ drk = on(btf,"1"),
 
 
 av = '0111111',
-l3v = '0299778999',
+l3v = '0288669999',
 
 0
 ),
@@ -477,24 +477,24 @@ B3 = (-B1 & B2),
 
 //V = rvs( A1 + L2[0], 20e3, [11,12,13,14,15], 2-(t/512%2), .2, 1, (t>>16)+1, 4, .1, .1, 16, [T,T+11e4,T+13e4,T+17e4,T+19e4], 99 ),
 
-//Mute
-//t>>18<1?A1=L3=0:0,
 A1 *= seq(av,18),
-L3 *= seq(l3v,17,t,1)/9,
+L3 *= seq(l3v,17,t,1)/8,
 
 vl = 2-(t/512%2),
 fb=[vl+.3,vl+.3,vl/2+1,vl],
 
+//Mute
+t>>18==7&&(L2=fb=[0,0.5],A1=L3=DR=B3=0),
+
 
 V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 8e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 8e3, [11,12,13,14,15], vl/2+1, .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
 
 
 
 //Master = ch => lim(
 Master = ch => tanh(hp(
 
-( L2[ch]*.6 + B3 + A1/9 + DR ) * min(1,t/1e6+.5) +
+( L2[ch]*.6 + B3 + A1/9 + DR ) * min(1,t/1e6+.5)  +
 
 //rv(L2[0]*2, 24e3, 2.1,.2,.5,4,T,.03,2,99,ch+.5)/3
 
@@ -509,4 +509,4 @@ lp2( V[ch], min(1,t/2e5+.1)) * min(1.3,t/6e5+.3)
 
 
 
-//,a=()=>{throw(I)},a()
+//,a=()=>{throw(I)},a() //Determine size of memory stack to initialize
