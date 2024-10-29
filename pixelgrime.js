@@ -149,16 +149,18 @@ rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T,
 ),
 
 rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [1,2], feedb = .7, dry = .4, wet = 1, dsp = 3, lerpx=4, highpass=.03, compSpeed = .1, compThresh = 64, t2 = [T,T], vibratoDepth = 99 ) => (
-	hd=ou=p=q=[0,0],
-	q.map( (e,i) => (
-		hd[i] = t2[i] + vibratoDepth +  vibratoDepth * sin(T*vibratoSpeed[i]/3e5),
-		ou[i] = hp( input*dry + wet * seq( F, 0, I + 4 + ( hd[i] % len ) / dsp, lerpx ) || 0, highpass),
-		p[i] = lp( max( compThresh, abs( input ) ), compSpeed, 99 ),
-		ou[i] *= feedb * compThresh / max( p[i], compThresh )
+	o=out=t2,peak=[9,9],
+	t2.map( (t2val,i) => (
+		t2[i] += vibratoDepth * 2 +  vibratoDepth * sin(T*vibratoSpeed[i]/3e5),
+		o[i] = hp( input*dry + wet * seq( F, 0, I + t2.length*2 + ( t2[i] % len ) / dsp, lerpx ) || 0, highpass),
+		peak[i] = lp( max( compThresh, abs( o[i] ) ), compSpeed, 99 ),
+		o[i] *= feedb * compThresh / max( peak[i], compThresh )
+		//o[i] *= feedb
 	)),
-	F[ I + ( (T % len) / dsp )|0 ] = ou[0] + ou[1],
+	F[ I + ( (T % len) / dsp )|0 ] = o.reduce((a,e)=>a+=e),
 	I += 0|(len / dsp),
-	ou
+	//[o.reduce((a,e,i)=>a+=i&1?e:0),o.reduce((a,e,i)=>a+=i&1?0:e)]
+	o.map((e,i)=>out[i%2]+=e),out
 	//F[ I - 0|(len / dsp) + ( (T % len) / dsp )|0 ]
 ),
 
@@ -456,24 +458,12 @@ Master = ch => tanh(hp(
 
 //,rv( L2[0] + B3, 20000, 1, .1, 1, 4,T,1e-2,4,1,9,.1,32)
 
-//,rvs( s2s(t&t>>9) , 80e3, [1,2], .7, .4, 1, 3, 4, .03, .1, 64, [T,T], 99 )
-
+V = rvs( s2s(t&t>>9) , 20e3, [11,12,13,14,15], .4, .4, 1, 8, 0, .03, .1, 64, [T,T-11e3,T-13e3,T-17e3,T-19e3], 99 ),
+//[V[0]+V[1]+V[4],V[2]+V[3]+V[4]]
+V
 //V = (mas, vsp) => rv( Master(mas), 40e3, 4, .4, 1, 3, T, .01, 4, 99, vsp, .1, 6 ),
 
-V = (mas, vsp, final) => ( o = rv( s2s(t&t>>9), 80e3, 8, .3, 1, 6, T, .03, 4, 199, vsp, .01, 6 ), final?0: 
-I-=(80e3/6|0)+2, o),
 
 
-V1 = V(0,7,0),
-//I-=(40e3/3|0)+3,
-V2 = V(1,9,0),
-//I-=(40e3/3|0)+3,
-V3 = V(0,5,0),
-//I-=(40e3/3|0)+3,
-V4 = V(1,3,1),
-
-
-
-[V1+V3,V2+V4]
 
 //,a=()=>{throw(I)},a()
