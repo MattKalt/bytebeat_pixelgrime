@@ -131,17 +131,18 @@ rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T,
 	input
 ),
 
-rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [1,2], feedb = .7, dry = .4, wet = 1, dsp = 3, lerpx=4, highpass=.03, compSpeed = .1, compThresh = 64, t2 = [T,T], vibratoDepth = 99 ) => (
-	o=out=t2,peak=[0,0],
+rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [1,2], wet = .7, dry = .4, feedb = 1, dsp = 3, lerpx=4, highpass=.03, compSpeed = .1, compThresh = 64, t2 = [T,T], vibratoDepth = 99 ) => (
+	o=[],peak=[],//out=[0,0] //can reuse o
 	t2.map( (t2val,i) => (
-		t2[i] += vibratoDepth * 2 +  vibratoDepth * sin(T*vibratoSpeed[i]/3e5),
-		o[i] = hp( input*dry + wet * seq( F, 0, I + t2.length*2 + ( t2[i] % len ) / dsp, lerpx ) || 0, highpass),
+		t2val += vibratoDepth * 2 +  vibratoDepth * sin(T*vibratoSpeed[i]/3e5),
+		o[i] = hp( input*dry + feedb * seq( F, 0, I + t2.length*2 + ( t2val % len ) / dsp, lerpx ) || 0, highpass),
 		peak[i] = lp( max( compThresh, abs( o[i] ) ), compSpeed, 99 ),
-		o[i] *= feedb * compThresh / max( peak[i], compThresh )
+		o[i] *= wet * compThresh / max( peak[i], compThresh )
 	)),
 	F[ I + ( (T % len) / dsp )|0 ] = o.reduce((a,e)=>a+=e),
 	I += 0|(len / dsp),
-	o.map((e,i)=>out[i%2]+=e),out
+	o.map((e,i)=>o[i%2]+=e),o //first 2 voices will be double volume
+	//o.map((e,i)=>out[i%2]+=e),out
 ),
 
 
