@@ -14,7 +14,7 @@ T = t,
 
 t *= r8 = 10 / 48,
 
-t-=t/8&128,		//subtle swang
+//t-=t/8&128,			//subtle swang
 //t-=t/4&256,		//heavy swang
 //t-=t/8&128*7,	//5/4 time
 //t-=t/4&128*7,	//3/4 time
@@ -65,8 +65,26 @@ mp = seq([0,-2,1,-3],18) - 3.5, //this is where the master pitch changes
 
 //t -= seq([t/4&256,0,t/8&128,t/8&128*7,t/4&128*7],9,t>>9,4),
 
+//GLITCH:
+
+//t>>9>4e3&&(t=1,mp=-8), //early cutoff with not too much excessive warping
 //t -= seq([t/4&896,0,t/4&896,t/8&128,t/8&128,t/4&896,t/8&128,t/4,t/2,t-1],18,t,seq('19100008',18)), //ultraglitch
-//t-= seq([t/4&896,0,0,t/4&896,t/8&128,t/4&896,t/8&128,t/4,t/2,t-1],18,t,seq('10000008',18)), //broken :(
+//t-= seq([t/4&896,0,t/8&128,t/4&896,t/8&128,t/4&896,t/8&128,t/4,t*.95],18,t,seq('1200000899',18)), //glich 2
+t>>9>3800&&(t=1,mp=-8), //early cutoff with not too much excessive warping
+
+t-= seq([
+	t/4&896,
+	0,
+	t/8&128,
+	t/2&8, //funny tom
+	t/8&128,
+	t/4&896,
+	t/8&128,
+	t-1
+],18,t,seq('1210004',18)), //glich 3
+
+
+
 
 
 //mseq = ( ...x ) => t * 2 ** ( seq(...x) / 12 ), //original
@@ -337,10 +355,14 @@ L3 = mseq(l1a,15,t,2)^mseq(l1a,15,t,8),
 
 L3 = L3*2&t>>5&31,
 
-//K = (sin(cbrt(199*(t%1024)))*127+(t/2&127))*bt(drk,10,1)**(1/8),
 K = (sin(sqrt(6*(t%1024)))*127+(t/2&127))*bt(drk,10,1)**(1/8),
 HH = bt([h],10)*seq(drh,10),
 SN = bt([s],10)*seq(drs,10),
+
+//T*r8>>18>5?K=SN=0:0, //drums silent during the glitch part
+T*r8>>18==6?K=SN=0:0, //drums silent during the rewind
+//T*r8>>18==6?K/=9:0, //drums quieter during the rewind
+
 
 DR = HH + SN + K * 3,
 
@@ -362,11 +384,11 @@ vl = 2-(t/512%2),
 fb=[vl/2+1,vl+.3,vl/2+1,vl],
 
 //Mute
-t>>9>=3074&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
+//t>>9>=3074&&(L2=fb=[2,0],A1=L3=DR=B3=0),
 //t>>9>=3586&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
 //t>>9>=4098&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
 
-
+t<9?fb[0]=6:0, //held note during "bluescreen" has more reverb
 
 V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 9e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
 
