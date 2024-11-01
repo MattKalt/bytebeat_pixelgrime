@@ -1,14 +1,28 @@
-// A collection of effects you can use on _ANY_ variable that changes
+
+/*
+
+	H 4 X X 3 D    U P    F O R    B A R B E C U E
+
+	using the GAv2 tech and a revamped stereo reverb function partly inspired by Feeshbread's Dead Data
+
+	T U R N    Y O U R    V O L U M E    U P !
+
+*/
 
 //Original t, increments one per sample. The reverb, harmonifier, hihat, and snare need this.
 T = t,
 
 t *= r8 = 10 / 48,
 
+t-=t/8&128,		//subtle swang
+//t-=t/4&256,		//heavy swang
+//t-=t/8&128*7,	//5/4 time
+//t-=t/4&128*7,	//3/4 time
+
+
+
 //master pitch, CHANGES BELOW
 mp = -3.5,
-
-
 //mp = -5, //for r8=11
 
 
@@ -30,12 +44,6 @@ tra = transpose = (x, amt) => Array.isArray(x)? x.map( e => e + amt ) : j( sp(x)
 // Particularly the NaN handing
 m = mix = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) || 0,
 
-// Waveshaper distortion
-// Assumes range is neatly between 0-255; use after limiter
-// Negative values make it rounder (though after -.6 it goes beyond {0..255} so there are wraparound artifacts)
-ds = (x, amt) => x * (1 - amt) + 127 * ( ( ( x / 127 ) - 1 ) ** 3 + 1 ) * amt,
-
-
 // F is the FX stack, stores memory for use in effects
 // Automatically keeps track of what's stored where
 // If you see red (NaNs), raise 26e3 higher, or adjust your reverbs' 'dsp' variable (and limiters' lookahead)
@@ -53,12 +61,15 @@ I = 0,
 /*v slight perf boost:*/
 seq=(r,s,t2=t,x=0)=>(i=t2/2**s,J=i|0,L=r.length,x?(k=(i-J)**x,(1-k)*r[J%L]+k*r[(J+1)%L]):r[J%L]),
 
-mp = seq([0,-2,1,-3],18) - 3.5,
+mp = seq([0,-2,1,-3],18) - 3.5, //this is where the master pitch changes
+
+//t -= seq([t/4&256,0,t/8&128,t/8&128*7,t/4&128*7],9,t>>9,4),
+
+//t -= seq([t/4&896,0,t/4&896,t/8&128,t/8&128,t/4&896,t/8&128,t/4,t/2,t-1],18,t,seq('19100008',18)), //ultraglitch
+//t-= seq([t/4&896,0,0,t/4&896,t/8&128,t/4&896,t/8&128,t/4,t/2,t-1],18,t,seq('10000008',18)), //broken :(
+
 
 //mseq = ( ...x ) => t * 2 ** ( seq(...x) / 12 ), //original
-mseq = ( ...x ) => t * 2 ** ( ( seq(...x) + mp )  / 12 ), //Trucker's Chorus version (specific to this song)
-//mseq = (arr, spd, T=t) => t * 2 ** ( ( ((t/9>>17)&3) + arr[ ( ( T >> spd+4 ) + ( 21 & T >> spd ) ) % arr.length] ) / 12 ), //changes all the melodies
-//smooth version, works well with seq lerp: (also features Trucker's Chorus)
 mseq = ( ...x ) => (
 	F[I++] += ( r8 * 2 ** ( ( seq(...x) + mp ) / 12))||0
 ),
@@ -81,55 +92,15 @@ bt = beat = (arr, spd, vel = 2e4, vol = 1, t2 = t, oct = 0) =>
 
 ls = sin(T / 9 & T >> 5), // long snare
 //s = sin(t>>5), // acoustic-sounding grungy snare
-//s = (((t*8/48)>>9) & 1) ? 0 : sin(t / 9 & t >> 5), // Snare
 s = seq( [ls, 0], 9), // Snare
-S = seq( [ls, 0], 8), // double snare
-//s = sin((t | t * .7) >> 4), // quieter snare
-//h = 1 & t * 441/480, // long Hihat
 h = 1 & T * 441/480, // long Hihat
 h = seq( [h,h,h,0], 8), //quieter, faster attack
 
-/*Has a tendency to 'wander', so use a limiter on the final mix
-dsp = downsample the bitrate of the reverb, dsp=2 cuts uses half as much space, 3 uses 1/3, etc
-	using values besides {1, 2, 3} can produce hi-pitch hum, however
-*/
-//rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 2, t2=T) => (
-//	x = y => I + ( 0|(y % len) / dsp ),
-//	bl = t2/dsp - (t2/dsp)|0, //how much to blend between this and next buffer
-//	input = input*dry + wet * ( ( 1 - bl ) * F[ x(t2) ] + bl * F[ x( t2 + dsp )] ) || 0,
-//	T % dsp ? 0 : F[ x(T) ] = input * feedb,
-//	I += 0|(len / dsp),
-//	input
-//),
-
-/*This reverb uses the lerping seq to save ~20 chars, but the lerp uses ~50 chars
-Has a tendency to 'wander', so use a limiter on the final mix
-dsp = downsample the bitrate of the reverb, dsp=2 cuts uses half as much space, 3 uses 1/3, etc
-	using values besides {1, 2, 3} can produce hi-pitch hum, however
-*/
 /*
-rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T) => (
-	input = input*dry + wet * seq( F, 0, I + ( t2 % len ) / dsp, 1 ) || 0,
-	T % dsp ? 0 : F[ I + ( (T % len) / dsp )|0 ] = input * feedb,
-	//F[ I + ( (T % len) / dsp )|0 ] = input * feedb ** (1/dsp), //higher dsp adds dampening
-	I += 0|(len / dsp),
-	input
-),
+	single input, outputs an array size 2
+	t2 and vibratospeed must have the same length (arbitrary)
+	requires old lp(), new hp(), and slidy seq() to function
 */
-
-
-rv = reverb = ( input, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 3, t2=T, highpass=.03, lerp=4, vibratoDepth=99, vibratoSpeed=1, compSpeed = .1, compThresh = 64 ) => (
-	t2 += vibratoDepth + vibratoDepth * sin(T*vibratoSpeed/3e5),
-	//input = hp( input*dry + wet * seq( F, 0, I + 1 + ( t2 % len ) / dsp, lerp ) || 0, highpass), //phaser
-	input = hp( input*dry + wet * seq( F, 0, I + 2 + ( t2 % len ) / dsp, lerp ) || 0, highpass),
-	pk = lp( max( compThresh, abs( input ) ), compSpeed, 99 ),
-	//input = tanh(input/256)*256,
-
-	F[ I + ( (T % len) / dsp )|0 ] = input * feedb * compThresh / max( pk, compThresh ), //higher dsp adds dampening
-	//F[ I + ( (T % len) / dsp )|0 ] = tanh(hp( input * feedb, highpass)/256)*256, //higher dsp adds dampening	
-	I += 0|(len / dsp),
-	input
-),
 
 rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [1,2], wet = .7, dry = .4, feedb = 1, dsp = 3, lerpx=4, highpass=.03, compSpeed = .1, compThresh = 64, t2 = [T,T], vibratoDepth = 99 ) => (
 	o=[],peak=[],//out=[0,0] //can reuse o
@@ -197,47 +168,6 @@ lim = limiter = (input, speed = .1, lookahead = 512, wet = 1, thresh = 9, bias =
 
 },
 
-// ~5 chars shorter when minified:
-/*
-lim = limiter = (input, speed = .1, lookahead = 512, wet = 1, thresh = 9, bias = 9, iters = 4, saturate = 0, p = 0) => (
-	x = y => I + 2 + ( T + y|0 ) % lookahead,
-	F[ x(0) ] = input,
-	o = F[ x(1) ], //oldest in buffer
-	mx = mi = o,
-	r(iters+1).map((e,i) => (
-		y = p ? ( i / (iters+1) ) ** p : 0,
-		z = F[ x( ( i + sin(i)/2 ) * lookahead / iters ) ], //sin(i) is for hum reduction
-		mi = min( mi, z * (1-y) + o * y ),
-		mx = max( mx, z * (1-y) + o * y ),
-		e)
-	),
-	mi = F[ I ] = min( mi, F[ I ] + speed ),
-	mx = F[ I+1 ] = max( mx, F[ I+1 ] - speed * ( bias + 1 ), mi + ( t ? thresh : 255 ) ),
-	F[ x(0) ] = input,
-	I += 2 + lookahead,
-	ds( ( o - mi ) * 255/(mx-mi), saturate ) * wet + o * (1-wet)
-),
-*/
-
-//shorter, worse performance, no 'p', no hum reduction
-/*
-lim2 = limiter = (input, speed = .1, lookahead = 512, wet = .99, thresh = 9, bias = 0, iters = 4, saturate = 0) => (
-	x = y => I + 2 + ( T + y|0 ) % lookahead,
-	o = F[ x(0) ], //oldest in buffer
-	mx = mi = o,
-	r(iters+1).map((e,i) => (
-		mi = min( mi, F[ x( i * lookahead / iters) ] ),
-		mx = max( mx, F[ x( i * lookahead / iters) ] ),
-		e)
-	),
-	mi = F[ I ] = min( mi, F[ I ] + speed ),
-	mx = F[ I+1 ] = max( mx, F[ I+1 ] - speed * ( bias + 1 ), mi + ( t ? thresh : 255 ) ),
-	F[ x(0) ] = input,
-	I += 2 + lookahead,
-	ds( ( o - mi ) * 255/(mx-mi), saturate ) * wet + o * (1-wet)
-),
-*/
-
 
 //XORs the input with its harmonics, controlled by the bits of a number ('tone')
 //pretends it uses a wavetable, but doesn't
@@ -252,44 +182,10 @@ hm = harmonify = (x,tone, waveTableSize = 8) => (
 	)
 ),
 
-//Version with a for-loop instead of reduce(), ~10 chars more after minification
-/*
-hm = harmonify = (x,tone, waveTableSize = 8) => {
-	waveTableSize *= 64 * T / t | 0;
-	o = 0;
-	//for (i=0; i < log2(tone) + 1; i++) { //flexible size of 'tone'
-	for (i=0; i<8; i++) {
-		y = (i+1)/2 * x,
-		o ^= ( ( 1 & (tone>>i) ) * y ) % waveTableSize
-		//o ^= ( ( 1 & (tone>>i) ) * y ) % waveTableSize ^ ( abs( m( tone>>(i+8) * y ) - 128 ) * 2 ) % waveTableSize
-	}
-	return o;
-},
-*/
-
-// Instead of computing on the fly, this version computes a wavetable at the start
-// Side effects: you can't start the song at any t, and output is always full-volume
-// Might not actually improve performance due to how JS handles memory -- further testing needed
-//hm = harmonify = (x, tone, waveTableSize = 4 ) => {
-//	waveTableSize *= 64 * T / t | 0;
-//	//play from the buffer
-//	if( F[I] > waveTableSize ) {
-//		o = F[ I + 1 + ( x * T / t & waveTableSize - 1) ];
-//		I += 1 + waveTableSize;
-//		return o
-//	}
-//	//fill the buffer
-//	for (i=0; i<8; i++) {
-//		F[ I + 1 + F[I] ] ^= ( 1 & (tone>>i) ) * (i+1)/2 * F[I] * t / T
-//	}
-//	F[I]++;
-//	I += 1 + waveTableSize;
-//	//return x //not strictly necessary unless the wavetable size is large enough to notice silence at the start
-//},
 
 
 // Version 1 of my Synth
-// A new version has been developed, but
+// A new version has been developed, but I lost it lmao
 
 //Basically just treat this like a black box and fiddle with the knobs at random
 //For a more detailed exmplanation:
@@ -460,13 +356,16 @@ B3 = (-B1 & B2),
 //V = rvs( A1 + L2[0], 20e3, [11,12,13,14,15], 2-(t/512%2), .2, 1, (t>>16)+1, 4, .1, .1, 16, [T,T+11e4,T+13e4,T+17e4,T+19e4], 99 ),
 
 A1 *= seq(av,18),
-L3 *= seq(l3v,17,t,1)/8,
+L3 *= seq(l3v,17,t,1)/9,
 
 vl = 2-(t/512%2),
 fb=[vl/2+1,vl+.3,vl/2+1,vl],
 
 //Mute
 t>>9>=3074&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
+//t>>9>=3586&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
+//t>>9>=4098&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
+
 
 
 V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 9e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
