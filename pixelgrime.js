@@ -3,7 +3,7 @@
 
 	H 4 X X 3 D    U P    F O R    B A R B E C U E
 
-	using the GAv2 tech and a revamped stereo reverb function
+	using the GAv2 tech and a revamped stereo reverb/chorus function
 
 	T U R N    Y O U R    V O L U M E    U P !
 
@@ -43,10 +43,12 @@ t-=seq([
 
 //-----TOOLS-----
 
-// Repeat x beats of y
-// SUPER useful if you're writing complex beats/melodies
-// Include this or the Fs won't work (or you could replace r(x, y) with Array(x).fill(y))
-// r(1,[arrays]) also serves as a replacement for [arrays].flat()
+/*
+	Repeat x beats of y
+	SUPER useful if you're writing complex beats/melodies
+	Include this or the Fs won't work (or you could replace r(x, y) with Array(x).fill(y))
+	r(1,[arrays]) also serves as a replacement for [arrays].flat()
+*/
 r = repeat = (x, y) => Array( x ).fill( y ).flat( 9 ),
 
 sp = (str, sep='') => str.split( sep ),
@@ -58,13 +60,15 @@ tra = transpose = (x, amt) => Array.isArray(x)? x.map( e => e + amt ) : j( sp(x)
 //pretty much deprecated but used in bt()
 m = mix = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) || 0,
 
-// F is the FX stack, stores memory for use in effects
-// Automatically keeps track of what's stored where
-// If you see red (NaNs), raise 26e3 higher, or adjust your reverbs' 'dsp' variable (and limiters' lookahead)
-// Works best when effects are not inside conditionals (meaning the number of F in use changes)
-// But even then, should only create a momentary click/pop (might be more severe for reverb)
-T ? 0 : F = r( 4096, 0 ),
-// Iterator, resets to 0 at every t
+/*
+	F is the FX stack, stores memory for use in effects
+	Automatically keeps track of what's stored where
+	If you see red (NaNs), raise 26e3 higher, or adjust your reverbs' 'dsp' variable (and limiters' lookahead)
+	Works best when effects are not inside conditionals (meaning the number of F in use changes)
+	But even then, should only create a momentary click/pop (might be more severe for reverb)
+*/
+T ? 0 : F = r( 2048, 0 ),
+// Index of F, resets to 0 at every t
 I = 0,
 
 //melodic sequences without clicks/pops
@@ -183,18 +187,19 @@ hm = harmonify = (x,tone, waveTableSize = 8) => (
 ),
 
 
+/*
+	Version 1 of my Synth
+A new version has been developed, but this is the one from GAv2 that I have a lot of tones for
 
-// Version 1 of my Synth
-// A new version has been developed, but I lost it lmao
-
-//Basically just treat this like a black box and fiddle with the knobs at random
-//For a more detailed exmplanation:
-//	X, and the First 2 hexes of y, are the fun surprise knobs :)
-//		Small changes in these values completely change the tone (most of the time)
-//	The next 2 hexes of y control the harmonifier
-// The next hex controls the *thump*/click/noise of the attack
-// The next hex controls the decay
-// The next 2 hexes control the lowpass
+Basically just treat this like a black box and fiddle with the knobs at random
+For a more detailed exmplanation:
+	X, and the First 2 hexes of y, are the fun surprise knobs :)
+		Small changes in these values completely change the tone (most of the time)
+	The next 2 hexes of y control the harmonifier
+	The next hex controls the thump/click/noise of the attack
+	The next hex controls the decay
+	The next 2 hexes control the lowpass
+*/
 sy = synth = (melody, velTrack, speed, x, y, ...z)=>
 	lp(
 		min(
@@ -334,13 +339,12 @@ L1 = ch => sy( mseq(m5,10,t,0), v5, 11, 1.07, tn1[ch] ) * (1+ch/8),
 L2 = [L1(0),L1(1)], //cacheing for performance
 
 L3 = mseq(l1a,15,t,2)^mseq(l1a,15,t,8),
-
 L3 = L3*2&t>>5&31,
+L3 *= seq(l3v,17,t,1)/9,
 
 K = (sin(sqrt(6*(t%1024)))*127+(t/2&127))*bt(drk,10,1)**(1/8),
 HH = bt([h],10)*seq(drh,10),
 SN = bt([s],10)*seq(drs,10),
-
 //T*r8>>18>5?K=SN=0:0, //drums silent during the glitch part
 T*r8>>18==6?K=SN=0:0, //drums silent during the rewind
 //T*r8>>18==6?K/=9:0, //drums quieter during the rewind
@@ -348,33 +352,23 @@ T*r8>>18==6?K=SN=0:0, //drums silent during the rewind
 
 DR = HH + SN + K * 3,
 
-//L3 = s2s(mseq(l1a,15,t,4)*8)/8,
-
 A1 = sy( mseq(a2,10),[1],10, 4.6, seq(ta,9,t>>9,1)),
 //A1 = sy( mseq(a2,10),[1],10, 4.6, 0xa21b02a6),
+A1 *= seq(av,18),
 
 B1 = mseq(b2,10,t,0) & 255 * seq(vb2,11),
 B2 = s2s(B1),
 B3 = (-B1 & B2),
 
-//V = rvs( A1 + L2[0], 20e3, [11,12,13,14,15], 2-(t/512%2), .2, 1, (t>>16)+1, 4, .1, .1, 16, [T,T+11e4,T+13e4,T+17e4,T+19e4], 99 ),
 
-A1 *= seq(av,18),
-L3 *= seq(l3v,17,t,1)/9,
 
 vl = 2-(t/512%2),
 fb=[vl/2+1,vl+.3,vl/2+1,vl],
 
-//Mute
-//t>>9>=3074&&(L2=fb=[2,0],A1=L3=DR=B3=0),
-//t>>9>=3586&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
-//t>>9>=4098&&(L2=fb=[0.5,0],A1=L3=DR=B3=0),
 
 t<9?fb[0]=6:0, //held note during "bluescreen" has more reverb
 
-V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 9e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
-
-
+V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 8e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .1, 16, [T,T,T,T,T], 99 ),
 
 //Master = ch => lim(
 Master = ch => tanh(hp(
