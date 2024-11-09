@@ -81,7 +81,7 @@ t-= seq([
 	t/4&896,
 	t/8&128,
 	t-1
-],18,t,seq('1210004',18)), //glich 3
+],18,t,seq('1120004',18)), //glich 3
 
 
 
@@ -115,6 +115,7 @@ h = 1 & T * 441/480, // long Hihat
 h = seq( [h,h,h,0], 8), //quieter, faster attack
 
 /*
+	Stereo delay with multiple heads (sorta similar to feeshbread's multitap delay in Dead Data)
 	single input, outputs an array size 2
 	t2 and vibratospeed must have the same length (arbitrary)
 	requires old lp(), new hp(), and slidy seq() to function
@@ -404,7 +405,7 @@ Master = ch => tanh(hp(
 lp2( V[ch], min(1,t/2e5+.1)) * min(1.3,t/6e5+.3)
 
 //, 1, 512, 1, 150 ),
-,.001)/max(150,300-t/8e3))*1.1,
+,.001)/max(ch?256/1.5:256,30-t/8e3))*(ch?1:1.5),
 
 [Master(0), Master(1)]
 
