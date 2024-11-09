@@ -3,7 +3,7 @@
 
 	H 4 X X 3 D    U P    F O R    B A R B E C U E
 
-	using the GAv2 tech and a revamped stereo reverb function partly inspired by Feeshbread's Dead Data
+	using the GAv2 tech and a revamped stereo reverb function
 
 	T U R N    Y O U R    V O L U M E    U P !
 
@@ -14,17 +14,34 @@ T = t,
 
 t *= r8 = 10 / 48,
 
-//t-=t/8&128,			//subtle swang
-//t-=t/4&256,		//heavy swang
-//t-=t/8&128*7,	//5/4 time
-//t-=t/4&128*7,	//3/4 time
+
+//seq = ( arr, spd, t2=t ) => arr[ (t2 >> spd) % arr.length ],
+/*version that lerps:
+	the 'x' argument controls the speed at which the slides happen (1=very slidy, 99=almost none, 0=none) */
+seq=(r,s,t2=t,x=0)=>(i=t2/2**s,J=i|0,L=r.length,x?(k=(i-J)**x,(1-k)*r[J%L]+k*r[(J+1)%L]):r[J%L]),
+
+//----SONG SETTINGS-----
+
+//master pitch
+mp = seq([0,-2,1,-3],18) - 3.5,
 
 
+t>>9>3800&&(t=1,mp=-8), //the "Bluescreen"
 
-//master pitch, CHANGES BELOW
-mp = -3.5,
-//mp = -5, //for r8=11
+//Changing rhythms:
+t-=seq([
+	t/4&896,
+	0,
+	t/8&128,
+	t/2&8, //funny tom
+	t/8&128,
+	t/4&896,
+	t/8&128,
+	t-1
+],18,t,seq('1120004',18)), //glich 3
 
+
+//-----TOOLS-----
 
 // Repeat x beats of y
 // SUPER useful if you're writing complex beats/melodies
@@ -38,10 +55,7 @@ j = (arr, sep='') => arr.join( sep ),
 //tra = transpose = (arr, amt) => arr.map(x=>x+amt),
 tra = transpose = (x, amt) => Array.isArray(x)? x.map( e => e + amt ) : j( sp(x).map( e => e + amt ) ),
 
-
-
-// Uses up a lot of chars and isn't /super/ readable, but a major timesaver when creating
-// Particularly the NaN handing
+//pretty much deprecated but used in bt()
 m = mix = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) || 0,
 
 // F is the FX stack, stores memory for use in effects
@@ -53,40 +67,7 @@ T ? 0 : F = r( 4096, 0 ),
 // Iterator, resets to 0 at every t
 I = 0,
 
-
-//seq = ( arr, spd, t2=t ) => arr[ (t2 >> spd) % arr.length ],
-/*version that lerps:
-	the 'x' argument controls the speed at which the slides happen (1=very slidy, 99=almost none, 0=none) */
-//seq=(r,s,t2=t,x=0)=>(i=t2/2**s,J=i|0,k=(i-J)**x,L=r.length,x?(1-k)*r[J%L]+k*r[(J+1)%L]:r[J%L]),
-/*v slight perf boost:*/
-seq=(r,s,t2=t,x=0)=>(i=t2/2**s,J=i|0,L=r.length,x?(k=(i-J)**x,(1-k)*r[J%L]+k*r[(J+1)%L]):r[J%L]),
-
-mp = seq([0,-2,1,-3],18) - 3.5, //this is where the master pitch changes
-
-//t -= seq([t/4&256,0,t/8&128,t/8&128*7,t/4&128*7],9,t>>9,4),
-
-//GLITCH:
-
-//t>>9>4e3&&(t=1,mp=-8), //early cutoff with not too much excessive warping
-//t -= seq([t/4&896,0,t/4&896,t/8&128,t/8&128,t/4&896,t/8&128,t/4,t/2,t-1],18,t,seq('19100008',18)), //ultraglitch
-//t-= seq([t/4&896,0,t/8&128,t/4&896,t/8&128,t/4&896,t/8&128,t/4,t*.95],18,t,seq('1200000899',18)), //glich 2
-t>>9>3800&&(t=1,mp=-8), //early cutoff with not too much excessive warping
-
-t-= seq([
-	t/4&896,
-	0,
-	t/8&128,
-	t/2&8, //funny tom
-	t/8&128,
-	t/4&896,
-	t/8&128,
-	t-1
-],18,t,seq('1120004',18)), //glich 3
-
-
-
-
-
+//melodic sequences without clicks/pops
 //mseq = ( ...x ) => t * 2 ** ( seq(...x) / 12 ), //original
 mseq = ( ...x ) => (
 	F[I++] += ( r8 * 2 ** ( ( seq(...x) + mp ) / 12))||0
@@ -397,11 +378,9 @@ V = rvs( vl * (A1/3 + L2[0]/2) + 2 * L3, 9e3, vv, seq(fb,18), .4, 1, 4, 4, .1, .
 
 //Master = ch => lim(
 Master = ch => tanh(hp(
-
+//		dry
 ( L2[ch]*.6 + B3 + A1/9 + DR ) * min(1,t/1e6+.5)  +
-
-//rv(L2[0]*2, 24e3, 2.1,.2,.5,4,T,.03,2,99,ch+.5)/3
-
+//		reverb
 lp2( V[ch], min(1,t/2e5+.1)) * min(1.3,t/6e5+.3)
 
 //, 1, 512, 1, 150 ),
