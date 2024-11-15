@@ -9,7 +9,7 @@
 
 */
 
-song = (r8,seq,mseq,mp,sp,tra,bt,ls,rvs,lp,lp2,hp,lim2,hm,sy,s2s,on,ht,m1,m2,m3,m4,v1,v4,b1,vb1,a1,bta,btb,btc,btd,bte,btf,L1,L2,L3,B1,B2,B3,HH,SN,DR,vl,vv,Master) => (
+song = (r8,seq,mseq,mp,sp,tra,bt,ls,rvs,lp,lp2,hp,lim2,hm,sy,s2s,on,ht,m1,m2,m3,m4,v1,v4,b1,vb1,a1,bta,btb,btc,btd,bte,btf,L1,L2,L3,B1,B2,B3,HH,SN,DR,vl,vv,Master,l1a=0,l3v=0,vb2=0,tn1=0,drs=0,drh=0,drk=0) => (
 
 
 //Original t, increments one per sample. The reverb, harmonifier, hihat, and snare need this.
