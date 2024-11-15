@@ -116,8 +116,8 @@ rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [7,9], dry = .4, wet = 
 		t2val += vibratoDepth*2 +  vibratoDepth * sin(T*vibratoSpeed[i]/3e6),
 		o[i] = hp(
 			input * dry/2 + wet*300/compThresh/vcs * seq(
-				F, 0, I + vcs*2-i + ( t2val % len ) / dsp, lerpx //more accurate but removing isn't a problem
-				//F, 0, I + ( t2val % len ) / dsp, lerpx
+				F, 0, I + vcs*2-i + ( t2val % len ) / dsp, lerpx
+				//F, 0, I + ( t2val % len ) / dsp, lerpx //glitchy
 			) || 0
 			, highpass
 		)
@@ -125,7 +125,6 @@ rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [7,9], dry = .4, wet = 
 	)),
 	F[ I + vcs + 1 + ( (T % len) / dsp )|0 ] = lp2(
 		o.reduce((a,e,i)=> a=lim2(
-			//a+e, compAtk,compRel,compThresh/vcs*(1+i/2)
 			a+e, compAtk,compRel,compThresh/vcs*(1+i/2)
 		)
 	), lowpass ),
@@ -135,11 +134,11 @@ rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [7,9], dry = .4, wet = 
 ),
 
 //bad lopass (turns things into triangles rather than sins) but good for compressor
-lp = lopass = (input, freq, bias=1) => ( // f ~= frequency, but not 1:1
+lp = lopass = (input, freq, bias=1) => // f ~= frequency, but not 1:1
 	// F[I] is the value of the last sample
 	// You will need to change the 'x % 256' if you're using signed or floatbeat
-	F[I] = min( max( input, F[I] - freq), F[I++] + freq * bias) // Clamp the change since last sample between (-f, f)
-),
+	F[I] = min( max( input, F[I] - freq), F[I++] + freq * bias)||0 // Clamp the change since last sample between (-f, f)
+,
 
 //better lopass, especially for hi-pass
 lp2 = (input,freq) =>
@@ -154,7 +153,7 @@ lim2 = (input, atk, release, thresh) => (
 	input * thresh / lp(
 		max( thresh, abs(input))
 	,release, atk/release
-	)
+	)||0
 ),
 
 /*
@@ -337,7 +336,8 @@ ta = r(1, [ r(4, 0x712b2321), r(2, 0xa21b02a6 ), 0x63010201 ] ),
 //vs=[3,5,7,11,13,17,19,23,29,31],
 //vs=[10,30,50,70,110,130,170,190,230,290,310],
 //vs=[41,42,43,44,45,46,47,48,49,50],
-vs=r(16,1).map((e,i)=>e*1.618**(i/2)),
+//vs=r(16,1).map((e,i)=>e*1.618**(i/2)),
+vs=r(16,399).map((e,i)=>e/1.618**(i/2)),
 //vv=[2,2,2,2,2],
 
 //vv=[PI,4],
@@ -362,7 +362,6 @@ l3v = '0289569999',
 0
 ),
 
-
 //----------------- MIXER -----------
 
 L1 = ch => sy( mseq(m5,10,t,0), v5, 11, 1.07, tn1[ch] ) * (1+ch/8),
@@ -380,7 +379,7 @@ T*r8>>18==6?K=SN=0:0, //drums silent during the rewind
 //T*r8>>18==6?K/=9:0, //drums quieter during the rewind
 
 
-DR = HH + SN + K * 3,
+DR = HH * 1.2 + SN + K * 3,
 
 A1 = sy( mseq(a2,10),[1],10, 4.6, seq(ta,9,t>>9,1)),
 //A1 = sy( mseq(a2,10),[1],10, 4.6, 0xa21b02a6),
@@ -400,7 +399,7 @@ vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+2], 18),
 //t<9?vv=69:0, //held note during "bluescreen" has more reverb
 
 
-V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, .9, 4, 0, .1, .5, 9, .1, 32, 699 ),
+V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<2?3:1.5, 4, 0, .1, min(.5,.2+t/2e5), 9, t/1e6, 99, 299 ),
 
 //Master = ch => lim(
 Master = ch => tanh(hp(
