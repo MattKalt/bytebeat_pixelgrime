@@ -9,6 +9,9 @@
 
 */
 
+song = (r8,seq,mseq,mp,sp,tra,bt,ls,rvs,lp,lp2,hp,lim2,hm,sy,s2s,on,ht,m1,m2,m3,m4,v1,v4,b1,vb1,a1,bta,btb,btc,btd,bte,btf,L1,L2,L3,B1,B2,B3,HH,SN,DR,vl,vv,Master) => (
+
+
 //Original t, increments one per sample. The reverb, harmonifier, hihat, and snare need this.
 T = t,
 
@@ -32,13 +35,13 @@ T>93e5&&(t=1,mp=-8), //the "Bluescreen"
 
 //Changing rhythms:
 t-=seq([
-	t/4&896,
+	b=t/4&896,
 	0,
-	t/8&128,
+	a=t/8&128,
 	t/2&8, //funny tom
-	t/8&128,
-	t/4&896,
-	t/8&128,
+	a,
+	b,
+	a,
 	t-1
 ],18,t,seq('1120004',18)), //glich 3
 
@@ -51,16 +54,16 @@ t-=seq([
 	Include this or the Fs won't work (or you could replace r(x, y) with Array(x).fill(y))
 	r(1,[arrays]) also serves as a replacement for [arrays].flat()
 */
-r = repeat = (x, y) => Array( x ).fill( y ).flat( 9 ),
+r = (x, y) => Array( x ).fill( y ).flat( 9 ),
 
-sp = (str, sep='') => str.split( sep ),
+//sp = (str, sep='') => str.split( sep ),
 j = (arr, sep='') => arr.join( sep ),
 
 //tra = transpose = (arr, amt) => arr.map(x=>x+amt),
-tra = transpose = (x, amt) => Array.isArray(x)? x.map( e => e + amt ) : j( sp(x).map( e => e + amt ) ),
+//tra = (x, amt) => Array.isArray(x)? x.map( e => e + amt ) : j( sp(x).map( e => e + amt ) ),
 
 //pretty much deprecated but used in bt()
-m = mix = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) || 0,
+m = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) || 0,
 
 /*
 	F is the FX stack, stores memory for use in effects
@@ -92,7 +95,7 @@ but if you replace 't2' with something other than t, such as any bytebeat melody
 you can apply that timbre to the melody.
 Adding / &ing a breakbeat with a melody can also add attack to the notes of the melody
 */
-bt = beat = (arr, spd, vel = 2e4, vol = 1, t2 = t, oct = 0) =>
+bt = (arr, spd, vel = 2e4, vol = 1, t2 = t, oct = 0) =>
 	m(vel / (t2 & (2 ** (spd - oct) / seq( arr, spd ) ) - 1), vol),
 
 ls = sin(T / 9 & T >> 5), // long snare
@@ -108,9 +111,10 @@ h = seq( [h,h,h,0], 8), //quieter, faster attack
 	requires old lp(), new hp(), lim2(), r(), and slidy seq() to function
 */
 
-rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [7,9], dry = .4, wet = 1, dsp = 3, lerpx=4, highpass=.03, lowpass = .5, compAtk = 9, compRel = 9, compThresh = 64, vibratoDepth = 99, t2 ) => (
-	vcs = vibratoSpeed.length,
-	t2 ??= r(vcs, T ), //array of all T the same size as vibratoSpeed[], could also be T/2 if specified in args
+rvs  = ( input, len, vibratoSpeed, dry, wet, dsp, lerpx, highpass, lowpass, compAtk, compRel, compThresh, vibratoDepth,
+vcs = vibratoSpeed.length,
+t2 = r(vcs,T)
+) => (
 	o=[],//out=[0,0] //can reuse o
 	t2.map( (t2val,i) => (
 		t2val += vibratoDepth*2 +  vibratoDepth * sin(T*vibratoSpeed[i]/3e6),
@@ -134,7 +138,7 @@ rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [7,9], dry = .4, wet = 
 ),
 
 //bad lopass (turns things into triangles rather than sins) but good for compressor
-lp = lopass = (input, freq, bias=1) => // f ~= frequency, but not 1:1
+lp = (input, freq, bias=1) => // f ~= frequency, but not 1:1
 	// F[I] is the value of the last sample
 	// You will need to change the 'x % 256' if you're using signed or floatbeat
 	F[I] = min( max( input, F[I] - freq), F[I++] + freq * bias)||0 // Clamp the change since last sample between (-f, f)
@@ -173,29 +177,11 @@ If your input only has peaks going upward (like anything involving beat() or syn
 	0..1: stacatto and trebly
 Hum reduction is only really noticeable when speed > 9 and thresh is low
 */
-lim = limiter = (input, speed = .1, lookahead = 512, wet = 1, thresh = 9, bias = 9, iters = 4, saturate = 0, p = 0) => {
-	x = y => I + 2 + ( T + y|0 ) % lookahead;
-	F[ x(0) ] = input; //newest in buffer, equivalent to F[ x(lookahead) ]
-	o = F[ x(1) ]; //oldest in buffer
-	mi = mx = o;
-	for( i=1; i <= iters; i++) { //older to newest
-		y = p ? ( i / (iters+1) ) ** p : 0;
-		z = F[ x( ( i + sin(i)/2 ) * lookahead / iters ) ]; //sin(i) is for hum reduction
-		mi = min( mi, z * (1-y) + o * y );
-		mx = max( mx, z * (1-y) + o * y );
-	}
-	mi = F[ I ] = min( mi, F[ I ] + speed );
-	mx = F[ I+1 ] = max( mx, F[ I+1 ] - speed * ( bias + 1 ), mi + ( t ? thresh : 255 ) ); //could probably be 99
-	I += 2 + lookahead;
-	return ds( ( o - mi ) * 255/(mx-mi), saturate ) * wet + o * (1-wet)
-	//return ds( ( o - mi ) * 2/(mx-mi) - 1, saturate ) * wet + o * (1-wet) //for floatbeat
-
-},
 
 
 //XORs the input with its harmonics, controlled by the bits of a number ('tone')
 //pretends it uses a wavetable, but doesn't
-hm = harmonify = (x,tone, waveTableSize = 8) => (
+hm = (x,tone, waveTableSize = 8) => (
 	//waveTableSize *= 64 * T / t | 0,
 	waveTableSize *= 64 / r8 | 0, //swing-proofed
 	r(8).reduce((o,e,i)=>(
@@ -220,34 +206,31 @@ For a more detailed exmplanation:
 	The next hex controls the decay
 	The next 2 hexes control the lowpass
 */
-sy = synth = (melody, velTrack, speed, x, y, ...z)=>
+sy = (melody, velTrack, speed, x, y, ...z)=>
 	lp(
 		min(
 			m(
 				hm(
-					beat( [x], 10, 6e4, 1, melody, .02* ( (y>>24) & 255 ) )
+					bt( [x], 10, 6e4, 1, melody, .02* ( (y>>24) & 255 ) )
 				, ( y>>16 ) & 255, ...z
 				)
 			, .9,1
 			)
-			+ beat( velTrack, speed, 1e3 * ( (y>>12) & 15) )
-		, beat( velTrack, speed, 1, 2e4 * ( (y>>8) & 15 ) )
+			+ bt( velTrack, speed, 1e3 * ( (y>>12) & 15) )
+		, bt( velTrack, speed, 1, 2e4 * ( (y>>8) & 15 ) )
 		)
 	, y&255
 	),
 
 
 //saw 2 sine
-s2s = sinify = x => sin( x*PI/64 ) * 126 + 128,
-
-v = vibrato = sin(T>>10)/2,
-
+s2s = x => sin( x*PI/64 ) * 126 + 128,
 
 //replaces wanted char with '1' and everything else with '0'
 on = (str, wanted) =>
 	str.replaceAll( RegExp( '[^' + wanted + ']', 'g' ), '0' ).replaceAll( RegExp( wanted, 'g'), '1' ),
 
-ht = halftime = arr => (
+ht = arr => (
 	arr = r(1,arr), //flatten
 	r(arr.length * 2).map( (e,i) => arr[i/2|0] )
 ),
@@ -269,27 +252,27 @@ t ? 0 : (
 */
 
 //13 beats
-m1 = r(1,[
+m1 = [
 	r(4, 0), r(2, [0,1,2,3]), 0
-]),
+],
 
 //16 beats
-v1 = r(1,[
+v1 = [
 	1,0,1,0, r(12, 1)
-]),
+],
 
 m2 = [8,1,8],
 
 m3 = [7,3,10],
 
 //doubletime
-m4 = r(1,[
+m4 = [
 	0,0,12,10, ht([7,6,3,2,0, r(6, -1 ) ])
-]),
+],
 
-v4 = r(1,[
+v4 = [
  1, 2, r(6,1)
-]),
+],
 
 m5 = r(1,[
  ht([m1, m2, m1, m3, m1, m2]), m4, ht(m2)
@@ -302,14 +285,14 @@ v5 = r(1, [
 
 
 //13 beats
-b1 = r(1,[
+b1 = [
 	12, 0, r(11, 0)
-]),
+],
 
 //16 beats
-vb1 = r(1,[
+vb1 = [
 	1,1, r(5, [1,0] ), r(4,1)
-]),
+],
 
 b2 = r(1,[
 	ht([b1, m2, b1, m3, b1, m2 ]), m4, ht(m2)
@@ -331,16 +314,8 @@ l1a = [5,7,8,10,1,4,-2,3],
 tn1 = [0x71010559, 0x610105ff],
 ta = r(1, [ r(4, 0x712b2321), r(2, 0xa21b02a6 ), 0x63010201 ] ),
 
-//vs=[11,12,13,14,15],
-//vs=[2,3,5,7,11,13],
-//vs=[3,5,7,11,13,17,19,23,29,31],
-//vs=[10,30,50,70,110,130,170,190,230,290,310],
-//vs=[41,42,43,44,45,46,47,48,49,50],
-//vs=r(16,1).map((e,i)=>e*1.618**(i/2)),
-vs=r(16,399).map((e,i)=>e/1.618**(i/2)),
-//vv=[2,2,2,2,2],
 
-//vv=[PI,4],
+vs=r(16,399).map((e,i)=>e/1.618**(i/2)),
 
 
 bta = "1 h s h 1 h s1hh",
@@ -396,45 +371,24 @@ vl = 2-(t/512%2),
 vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+2], 18),
 
 
-//t<9?vv=69:0, //held note during "bluescreen" has more reverb
 
-
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<2?3:1.5, max(4,36-(t>>12)), 0, .1, min(.5,.5+t/5e5), 9, t/1e6, 99, 299 ),
-
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,10-(T>>14)/3), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,8-(T>>14)/4), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,12-(T>>14)/2), 0, .1, .5, 9, 9, 99, 299 ),
-V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,21-(T>>13)/2), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,38-(T>>13)), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,6-sin((t>>14)*PI/8)*2), 0, .1, .5, 9, 9, 99, 299 ),
-
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<2?3:1.5, 4, 0, .1, .5, 9, 9, 99, 299 ),
+V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?2:1.5, max(4,21-(T>>13)/2), 0, .1, .5, 9, 9, 99, 299 ),
 
 
 //Master = ch => lim(
 Master = ch => tanh(hp(
-
 //		dry
 ( L2[ch]*.6 + B3 + A1/9 + DR ) * 1 +
 //		reverb
-//lp2( V[ch], min(1,t/2e5+.1)) * min(4, T/5e4, 2+t/5e5)
-
 lp2( V[ch], min(1,t/2e5+.1)) * vv/6
-
-
-/*
-//		dry
-( L2[ch]*.6 + B3 + A1/9 + DR ) * (min(1,t/1e6+.5)==1?1:0)  + //50s
-//		reverb
-lp2( V[ch], min(1,t/2e5+.1)) * (min(3.9,t/2e5+.9)==3.9?3.9:0) //64s
-*/
-
 //, 1, 512, 1, 150 ),
 ,.001)/max(170,300-t/5e3,600-t/999))*1.1,
 
 
 
 [Master(0), Master(1)]
+
+), song()
 
 
 //,a=()=>{throw(I)},a() //Determine size of memory stack to initialize
