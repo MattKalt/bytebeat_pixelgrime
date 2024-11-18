@@ -3,7 +3,7 @@
 
 	H 4 X X 3 D    U P    F O R    B A R B E C U E
 
-	using the GAv2 tech and a revamped stereo reverb/chorus function
+	using the GAv2 tech and a stereo reverb/chorus function
 
 	T U R N    Y O U R    V O L U M E    U P !
 
@@ -379,7 +379,7 @@ T*r8>>18==6?K=SN=0:0, //drums silent during the rewind
 //T*r8>>18==6?K/=9:0, //drums quieter during the rewind
 
 
-DR = HH * 1.2 + SN + K * 3,
+DR = HH + SN + K * 3,
 
 A1 = sy( mseq(a2,10),[1],10, 4.6, seq(ta,9,t>>9,1)),
 //A1 = sy( mseq(a2,10),[1],10, 4.6, 0xa21b02a6),
@@ -392,8 +392,8 @@ B3 = (-B1 & B2),
 
 
 vl = 2-(t/512%2),
-//vv = seq( [vl/2+1, vl+.5, vl/2+1, vl+.2], 18),
-vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+2], 18),
+//vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+2], 18),
+vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+4], 18),
 
 
 //t<9?vv=69:0, //held note during "bluescreen" has more reverb
@@ -404,7 +404,7 @@ vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+2], 18),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,10-(T>>14)/3), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,8-(T>>14)/4), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,12-(T>>14)/2), 0, .1, .5, 9, 9, 99, 299 ),
-V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,21-(T>>13)/2), 0, .1, .5, 9, 9, 99, 299 ),
+V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, t<9?3:vv/8, max(4,21-(T>>13)/2), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,38-(T>>13)), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,6-sin((t>>14)*PI/8)*2), 0, .1, .5, 9, 9, 99, 299 ),
 
@@ -419,7 +419,7 @@ Master = ch => tanh(hp(
 //		reverb
 //lp2( V[ch], min(1,t/2e5+.1)) * min(4, T/5e4, 2+t/5e5)
 
-lp2( V[ch], min(1,t/2e5+.1)) * vv/6
+lp2( V[ch], min(1,t/2e5+.1)) * 1.5
 
 
 /*
@@ -430,7 +430,7 @@ lp2( V[ch], min(1,t/2e5+.1)) * (min(3.9,t/2e5+.9)==3.9?3.9:0) //64s
 */
 
 //, 1, 512, 1, 150 ),
-,.001)/max(170,300-t/5e3,600-t/999))*1.1,
+,.001)/max(170,300-t/5e3,500-t/1e3))*1.1,
 
 
 
