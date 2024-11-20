@@ -69,7 +69,7 @@ m = mix = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) |
 	Works best when effects are not inside conditionals (meaning the number of F in use changes)
 	But even then, should only create a momentary click/pop (might be more severe for reverb)
 */
-T ? 0 : F = r( 2048, 0 ),
+T ? 0 : F = r( 1e6, 0 ),
 // Index of F, resets to 0 at every t
 I = 0,
 
@@ -416,7 +416,10 @@ vw=299-((r8*T>>10&255)>>5-(r8*T>>18)), //get more feedbacky right before key cha
 //V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vv, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, 360-(r8*T>>10&255) ),
 V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vvl, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, vw ),
 
-//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3),
+//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 16e3, [91,83,23,13,7,5], .2, 1, PI/1, 2, .1, .7, 9, 9, 99, 0),
+
+//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 16e3, [91,83,23], .2, .7, PI/1, 1, .1, .7, 9, 9, 99, 299),
+
 
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,38-(T>>13)), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,6-sin((t>>14)*PI/8)*2), 0, .1, .5, 9, 9, 99, 299 ),
