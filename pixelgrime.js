@@ -108,7 +108,7 @@ h = seq( [h,h,h,0], 8), //quieter, faster attack
 	requires old lp(), new hp(), lim2(), r(), and slidy seq() to function
 */
 
-rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [7,9], dry = .4, wet = 1, dsp = 3, lerpx=4, highpass=.03, lowpass = .5, compAtk = 9, compRel = 9, compThresh = 64, vibratoDepth = 99, t2 ) => (
+rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = .2, wet = .8, dsp = 3, lerpx=4, highpass=.1, lowpass = .5, compAtk = 9, compRel = 1, compThresh = 99, vibratoDepth = 299, t2 ) => (
 	vcs = vibratoSpeed.length,
 	t2 ??= r(vcs, T ), //array of all T the same size as vibratoSpeed[], could also be T/2 if specified in args
 	o=[],//out=[0,0] //can reuse o
@@ -392,11 +392,18 @@ B3 = (-B1 & B2),
 
 
 vl = 2-(t/512%2),
-//vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+2], 18),
-vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+4], 18),
+vvl = t<9 ? 2.5 : seq( [ vl*4+9, vl*8+4 ], 18) / 8,
 
-
-//t<9?vv=69:0, //held note during "bluescreen" has more reverb
+//vw=310-(r8*T>>10&255)**2/(218-(t>>18)),
+//vw=311-(r8*T>>10&255)**2/(261-(T*r8>>16)),
+//vw=310-(r8*T>>10&255)**2/(250-(T*r8>>16)),
+vw=299-((r8*T>>10&255)>>5-(r8*T>>18)), //get more feedbacky right before key change
+//vw=299-((r8*T>>10&255)>>5-(r8*T>>18)%6),
+//vw=299-((r8*2*T>>10&511)>>6-(r8*T>>18)),
+//vw=299-((r8*4*T>>10&1023)>>9-(r8*T>>18)),
+//vw=299-((r8*T>>10&255)>>5-(r8*T>>18)%6)**2/256,
+//vw=299-((r8*T>>10&255)>>5-(r8*T>>18)%6)**2/228,
+//vw=299,
 
 
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<2?3:1.5, max(4,36-(t>>12)), 0, .1, min(.5,.5+t/5e5), 9, t/1e6, 99, 299 ),
@@ -404,7 +411,13 @@ vv = seq( [vl*4+9, vl*8+4, vl*4+9, vl*8+4], 18),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,10-(T>>14)/3), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,8-(T>>14)/4), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,12-(T>>14)/2), 0, .1, .5, 9, 9, 99, 299 ),
-V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, t<9?3:vv/8, max(4,21-(T>>13)/2), 0, .1, .5, 9, 9, 99, 299 ),
+//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, t<9?2.5:vv/8, max(4,21-(T>>13)/2), 4, .1, .7, 9, 9, 99, t>26e4?199:299 ),
+//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vv, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, 305-T/6e4 ),
+//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vv, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, 360-(r8*T>>10&255) ),
+//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vvl, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, vw ),
+
+V=rvs(vl * (A1/2.5 + L2[0]/2) + L3),
+
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,38-(T>>13)), 0, .1, .5, 9, 9, 99, 299 ),
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,6-sin((t>>14)*PI/8)*2), 0, .1, .5, 9, 9, 99, 299 ),
 
@@ -415,11 +428,11 @@ V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, t<9?3:vv/8, max(4,21-(T>>13)
 Master = ch => tanh(hp(
 
 //		dry
-( L2[ch]*.6 + B3 + A1/9 + DR ) * 1 +
+( L2[ch]*.6 + B3 + A1/8 + DR ) * 1 +
 //		reverb
 //lp2( V[ch], min(1,t/2e5+.1)) * min(4, T/5e4, 2+t/5e5)
 
-lp2( V[ch], min(1,t/2e5+.1)) * 1.5
+V[ch] * 1.5
 
 
 /*
@@ -437,4 +450,5 @@ lp2( V[ch], min(1,t/2e5+.1)) * (min(3.9,t/2e5+.9)==3.9?3.9:0) //64s
 [Master(0), Master(1)]
 
 
-//,a=()=>{throw(I)},a() //Determine size of memory stack to initialize
+//a=()=>{throw(I)},a() //Determine size of memory stack to initialize
+//a=()=>{throw(vw)},T%8192?[Master(0), Master(1)]:a()
