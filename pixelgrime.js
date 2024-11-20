@@ -69,7 +69,7 @@ m = mix = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) |
 	Works best when effects are not inside conditionals (meaning the number of F in use changes)
 	But even then, should only create a momentary click/pop (might be more severe for reverb)
 */
-T ? 0 : F = r( 1e6, 0 ),
+T ? 0 : F = r( 2048, 0 ),
 // Index of F, resets to 0 at every t
 I = 0,
 
