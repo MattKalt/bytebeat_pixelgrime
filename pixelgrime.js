@@ -69,7 +69,7 @@ m = mix = (x, vol=1, dist=0) => ( ( x * vol * ( 1 + dist ) ) % ( 256 * vol ) ) |
 	Works best when effects are not inside conditionals (meaning the number of F in use changes)
 	But even then, should only create a momentary click/pop (might be more severe for reverb)
 */
-T ? 0 : F = r( 2048, 0 ),
+T ? 0 : F = r( 1e6, 0 ),
 // Index of F, resets to 0 at every t
 I = 0,
 
@@ -108,7 +108,7 @@ h = seq( [h,h,h,0], 8), //quieter, faster attack
 	requires old lp(), new hp(), lim2(), r(), and slidy seq() to function
 */
 
-rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = .2, wet = .8, dsp = 3, lerpx=4, highpass=.1, lowpass = .5, compAtk = 9, compRel = 1, compThresh = 99, vibratoDepth = 299, t2 ) => (
+rvs2 = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = .2, wet = .8, dsp = 3, lerpx=4, highpass=.1, lowpass = .5, compAtk = 9, compRel = 1, compThresh = 999999, vibratoDepth = 299, t2 ) => (
 	vcs = vibratoSpeed.length,
 	t2 ??= r(vcs, T ), //array of all T the same size as vibratoSpeed[], could also be T/2 if specified in args
 	o=[],//out=[0,0] //can reuse o
@@ -131,6 +131,83 @@ rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = 
 	I += 0|(len / dsp),
 	o.map((e,i)=>o[i%2]+=e),o //first 2 voices will be double volume
 	//o.map((e,i)=>out[i%2]+=e),out
+),
+
+
+rvs3 = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = .1, wet = .9, feedb =.6, dsp = 3, lerpx=4, highpass=.1, lowpass = .5, compAtk = 9, compRel = 1, compThresh = 9, vibratoDepth = 299, t2 ) => (
+	vcs = vibratoSpeed.length,
+	t2 ??= r(vcs, T ), //array of all T the same size as vibratoSpeed[], could also be T/2 if specified in args
+	o=[], out=[0,0], //can reuse o
+	t2.map( (t2val,i) => (
+		t2val += vibratoDepth*2 +  vibratoDepth * sin(T*vibratoSpeed[i]/3e6),
+		o[i] = hp(
+			seq(
+				F, 0, I + vcs*2-i + ( t2val % len ) / dsp, lerpx
+				//F, 0, I + ( t2val % len ) / dsp, lerpx //glitchy
+			) || 0
+			, highpass
+		)
+		//,o[i] = lim2(o[i],compAtk,compRel,compThresh) //lim()ing here creates more feedback
+	)),
+	//F[ I + vcs + 1 + ( (T % len) / dsp )|0 ] = input * (1-feedb) + lp2(
+	F[ I + vcs + 1 + ( (T % len) / dsp )|0 ] = lp2(
+		input * (1-feedb) +
+		o.reduce((a,e,i)=> a=lim2(
+			a+e, compAtk,compRel,compThresh*(1+i/vcs)
+		) * feedb
+	), lowpass ),
+	I += 0|(len / dsp),
+	//o.map((e,i)=>o[i%2]+=e*wet+input*dry/vcs),o //first 2 voices will be double volume
+	o.map((e,i)=>out[i%2]+=e*wet+input*dry/vcs),out
+),
+
+rvs4 = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = .1, wet = .9, feedb =.7, dsp = 3, lerpx=4, highpass=.1, lowpass = .5, compAtk = 9, compRel = 1, compThresh = 9, vibratoDepth = 299, t2 ) => (
+	vcs = vibratoSpeed.length,
+	t2 ??= r(vcs, T ), //array of all T the same size as vibratoSpeed[], could also be T/2 if specified in args
+	o=[], out=[0,0], //can reuse o
+	t2.map( (t2val,i) => (
+		t2val += vibratoDepth * 2 + vibratoDepth * sin(T*vibratoSpeed[i]/3e6),
+		o[i] =
+			seq(
+				F, 0, I + vcs + 2 + ( t2val % len ) / dsp, lerpx
+				//F, 0, I + ( t2val % len ) / dsp, lerpx //glitchy
+			)
+		//,o[i] = lim2(o[i],compAtk,compRel,compThresh) //lim()ing here creates more feedback
+	)),
+	//F[ I + vcs + 1 + ( (T % len) / dsp )|0 ] = input * (1-feedb) + lp2(
+	F[ I + vcs + 2 + ( (T % len) / dsp )|0 ] = lp2(
+		hp(
+		input * (1-feedb) +
+		o.reduce((a,e,i)=> a=lim2(
+			a+e, compAtk,compRel,compThresh*(1+i/vcs)
+		) * feedb
+		), highpass
+	), lowpass ),
+	I += 0|(len / dsp),
+	//o.map((e,i)=>o[i%2]+=e*wet+input*dry/vcs),o //first 2 voices will be double volume
+	o.map((e,i)=>out[i%2]+=e*wet+input*dry/vcs),out
+),
+
+rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = .4, wet = .6, feedb =.6, dsp = 3, lerpx=4, highpass=.1, lowpass = .7, compAtk = 9, compRel = 1, compThresh = 9, vibratoDepth = 299, t2 ) => (
+	vcs = vibratoSpeed.length,
+	t2 ??= r(vcs, T ), //array of all T the same size as vibratoSpeed[], could also be T/2 if specified in args
+	x = y => I + vcs + 2 + ( (y % len) / dsp )|0,
+	fbh=[], out=[0,0],
+	t2.map( (t2val,i)=> (
+		t2val += vibratoDepth * 2 + vibratoDepth * sin(T*vibratoSpeed[i]/3e6),
+		fbh[i] = seq( F, 0, x(t2val), lerpx )||0
+	)),
+	F[ x(T) ] = lp2(
+		hp(
+			input * (1-feedb) +
+			fbh.reduce((a,e,i)=> a=lim2(
+				a+e, compAtk,compRel,compThresh*(1+i/vcs)
+			) * feedb )
+		, highpass )
+	, lowpass ),
+	I += 0|(len / dsp) + vcs + 2,
+	//o.map((e,i)=>o[i%2]+=e*wet+input*dry/vcs),o //first 2 voices will be double volume
+	fbh.map((e,i)=>out[i%2]+=e*wet+input*dry/vcs),out
 ),
 
 //bad lopass (turns things into triangles rather than sins) but good for compressor
@@ -337,7 +414,7 @@ ta = r(1, [ r(4, 0x712b2321), r(2, 0xa21b02a6 ), 0x63010201 ] ),
 //vs=[10,30,50,70,110,130,170,190,230,290,310],
 //vs=[41,42,43,44,45,46,47,48,49,50],
 //vs=r(16,1).map((e,i)=>e*1.618**(i/2)),
-vs=r(16,399).map((e,i)=>e/1.618**(i/2)),
+vs=r(16,199).map((e,i)=>e/1.618**(i/2)),
 //vv=[2,2,2,2,2],
 
 //vv=[PI,4],
@@ -414,11 +491,13 @@ vw=299-((r8*T>>10&255)>>5-(r8*T>>18)), //get more feedbacky right before key cha
 //V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, t<9?2.5:vv/8, max(4,21-(T>>13)/2), 4, .1, .7, 9, 9, 99, t>26e4?199:299 ),
 //V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vv, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, 305-T/6e4 ),
 //V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vv, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, 360-(r8*T>>10&255) ),
-V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vvl, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, vw ),
+//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vvl, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, vw ),
 
-//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 16e3, [91,83,23,13,7,5], .2, 1, PI/1, 2, .1, .7, 9, 9, 99, 0),
 
-//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 16e3, [91,83,23], .2, .7, PI/1, 1, .1, .7, 9, 9, 99, 299),
+//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3),
+//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .5, .5, .7 ),
+V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .5, .5, .7, max(4,38-(T>>13)) ),
+
 
 
 //V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,38-(T>>13)), 0, .1, .5, 9, 9, 99, 299 ),
