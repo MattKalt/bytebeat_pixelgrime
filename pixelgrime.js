@@ -4,6 +4,7 @@
 	H 4 X X 3 D    U P    F O R    B A R B E C U E
 
 	using the GAv2 tech and a stereo reverb/chorus function
+		*(the better version of this function is in Motherlode V2)
 
 	T U R N    Y O U R    V O L U M E    U P !
 
@@ -25,20 +26,18 @@ seq=(r,s,t2=t,x=0)=>(i=t2/2**s,J=i|0,L=r.length,x?(k=(i-J)**x,(1-k)*r[J%L]+k*r[(
 //master pitch
 mp = seq([0,-2,1,-3],18) - 3.5,
 
-
-//t>>9>3800&&(t=1,mp=-8), //the "Bluescreen"
 T>93e5&&(t=1,mp=-8), //the "Bluescreen"
 
 
 //Changing rhythms:
 t-=seq([
-	t/4&896,
+	trip = t/4&896,
 	0,
-	t/8&128,
+	swing = t/8&128,
 	t/2&8, //funny tom
-	t/8&128,
-	t/4&896,
-	t/8&128,
+	swing,
+	trip,
+	swing,
 	t-1
 ],18,t,seq('1120004',18)), //glich 3
 
@@ -102,10 +101,11 @@ h = 1 & T * 441/480, // long Hihat
 h = seq( [h,h,h,0], 8), //quieter, faster attack
 
 /*
-	Stereo delay with multiple heads (sorta similar to feeshbread's multitap delay in Dead Data)
+	Stereo delay/chorus effect (Better version in Motherlode V2)
 	single input, outputs an array size 2
 	t2 and vibratospeed must have the same length (arbitrary)
 	requires old lp(), new hp(), lim2(), r(), and slidy seq() to function
+	partly inspired by Feeshbread's Dead Data echo
 */
 
 rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = .2, wet = .8, dsp = 3, lerpx=4, highpass=.1, lowpass = .5, compAtk = 9, compRel = 1, compThresh = 99, vibratoDepth = 299, t2 ) => (
@@ -123,7 +123,7 @@ rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = 
 		)
 		//,o[i] = lim2(o[i],compAtk,compRel,compThresh) //lim()ing here creates more feedback
 	)),
-	F[ I + vcs + 1 + ( (T % len) / dsp )|0 ] = lp2(
+	F[ I + vcs + 1 + ( (T % len) / dsp )|0 ] = lp(
 		o.reduce((a,e,i)=> a=lim2(
 			a+e, compAtk,compRel,compThresh/vcs*(1+i/2)
 		)
@@ -134,23 +134,23 @@ rvs = reverbStereo = ( input, len = 16e3, vibratoSpeed = [91,83,77,67,5], dry = 
 ),
 
 //bad lopass (turns things into triangles rather than sins) but good for compressor
-lp = lopass = (input, freq, bias=1) => // f ~= frequency, but not 1:1
+lp2 = lopass = (input, freq, bias=1) => // f ~= frequency, but not 1:1
 	// F[I] is the value of the last sample
 	// You will need to change the 'x % 256' if you're using signed or floatbeat
 	F[I] = min( max( input, F[I] - freq), F[I++] + freq * bias)||0 // Clamp the change since last sample between (-f, f)
 ,
 
 //better lopass, especially for hi-pass
-lp2 = (input,freq) =>
+lp = (input,freq) =>
 	F[I] = F[I++] * (1-freq) + input * freq
 ,
 
-hp = (input,freq) => input - lp2(input,freq),
+hp = (input,freq) => input - lp(input,freq),
 
 //simple but bad limiter, uses the bad lopass
 //release must be >0
 lim2 = (input, atk, release, thresh) => (
-	input * thresh / lp(
+	input * thresh / lp2(
 		max( thresh, abs(input))
 	,release, atk/release
 	)||0
@@ -221,7 +221,7 @@ For a more detailed exmplanation:
 	The next 2 hexes control the lowpass
 */
 sy = synth = (melody, velTrack, speed, x, y, ...z)=>
-	lp(
+	lp2(
 		min(
 			m(
 				hm(
@@ -331,16 +331,7 @@ l1a = [5,7,8,10,1,4,-2,3],
 tn1 = [0x71010559, 0x610105ff],
 ta = r(1, [ r(4, 0x712b2321), r(2, 0xa21b02a6 ), 0x63010201 ] ),
 
-//vs=[11,12,13,14,15],
-//vs=[2,3,5,7,11,13],
-//vs=[3,5,7,11,13,17,19,23,29,31],
-//vs=[10,30,50,70,110,130,170,190,230,290,310],
-//vs=[41,42,43,44,45,46,47,48,49,50],
-//vs=r(16,1).map((e,i)=>e*1.618**(i/2)),
 vs=r(16,399).map((e,i)=>e/1.618**(i/2)),
-//vv=[2,2,2,2,2],
-
-//vv=[PI,4],
 
 
 bta = "1 h s h 1 h s1hh",
@@ -382,7 +373,6 @@ T*r8>>18==6?K=SN=0:0, //drums silent during the rewind
 DR = HH + SN + K * 3,
 
 A1 = sy( mseq(a2,10),[1],10, 4.6, seq(ta,9,t>>9,1)),
-//A1 = sy( mseq(a2,10),[1],10, 4.6, 0xa21b02a6),
 A1 *= seq(av,18),
 
 B1 = mseq(b2,10,t,0) & 255 * seq(vb2,11),
@@ -394,37 +384,9 @@ B3 = (-B1 & B2),
 vl = 2-(t/512%2),
 vvl = t<9 ? 2.5 : seq( [ vl*4+9, vl*8+4 ], 18) / 8,
 
-//vw=310-(r8*T>>10&255)**2/(218-(t>>18)),
-//vw=311-(r8*T>>10&255)**2/(261-(T*r8>>16)),
-//vw=310-(r8*T>>10&255)**2/(250-(T*r8>>16)),
 vw=299-((r8*T>>10&255)>>5-(r8*T>>18)), //get more feedbacky right before key change
-//vw=299-((r8*T>>10&255)>>5-(r8*T>>18)%6),
-//vw=299-((r8*2*T>>10&511)>>6-(r8*T>>18)),
-//vw=299-((r8*4*T>>10&1023)>>9-(r8*T>>18)),
-//vw=299-((r8*T>>10&255)>>5-(r8*T>>18)%6)**2/256,
-//vw=299-((r8*T>>10&255)>>5-(r8*T>>18)%6)**2/228,
-//vw=299,
 
-
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<2?3:1.5, max(4,36-(t>>12)), 0, .1, min(.5,.5+t/5e5), 9, t/1e6, 99, 299 ),
-
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,10-(T>>14)/3), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,8-(T>>14)/4), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,12-(T>>14)/2), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, t<9?2.5:vv/8, max(4,21-(T>>13)/2), 4, .1, .7, 9, 9, 99, t>26e4?199:299 ),
-//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vv, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, 305-T/6e4 ),
-//V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vv, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, 360-(r8*T>>10&255) ),
 V = rvs( vl * (A1/2.5 + L2[0]/2) + L3, 8e3, vs, .1, vvl, max(4,21-(T>>13)/2), 2, .1, .7, 9, 9, 99, vw ),
-
-//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 16e3, [91,83,23,13,7,5], .2, 1, PI/1, 2, .1, .7, 9, 9, 99, 0),
-
-//V=rvs(vl * (A1/2.5 + L2[0]/2) + L3, 16e3, [91,83,23], .2, .7, PI/1, 1, .1, .7, 9, 9, 99, 299),
-
-
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,38-(T>>13)), 0, .1, .5, 9, 9, 99, 299 ),
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<99?3:1.5, max(4,6-sin((t>>14)*PI/8)*2), 0, .1, .5, 9, 9, 99, 299 ),
-
-//V = rvs( vl * (A1/3 + L2[0]/2) + L3, 8e3, vs, .1, t<2?3:1.5, 4, 0, .1, .5, 9, 9, 99, 299 ),
 
 
 //Master = ch => lim(
@@ -433,17 +395,8 @@ Master = ch => tanh(hp(
 //		dry
 ( L2[ch]*.6 + B3 + A1/8 + DR ) * 1 +
 //		reverb
-//lp2( V[ch], min(1,t/2e5+.1)) * min(4, T/5e4, 2+t/5e5)
-
 V[ch] * 1.5
 
-
-/*
-//		dry
-( L2[ch]*.6 + B3 + A1/9 + DR ) * (min(1,t/1e6+.5)==1?1:0)  + //50s
-//		reverb
-lp2( V[ch], min(1,t/2e5+.1)) * (min(3.9,t/2e5+.9)==3.9?3.9:0) //64s
-*/
 
 //, 1, 512, 1, 150 ),
 ,.001)/max(170,300-t/5e3,500-t/1e3))*1.1,
@@ -453,5 +406,4 @@ lp2( V[ch], min(1,t/2e5+.1)) * (min(3.9,t/2e5+.9)==3.9?3.9:0) //64s
 [Master(0), Master(1)]
 
 
-//a=()=>{throw(I)},a() //Determine size of memory stack to initialize
-//a=()=>{throw(vw)},T%8192?[Master(0), Master(1)]:a()
+//a=()=>{throw(I)},a() //Determine amount of memory to initialize
